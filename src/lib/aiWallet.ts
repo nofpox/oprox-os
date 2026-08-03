@@ -37,7 +37,7 @@ export async function resetAiWalletState(): Promise<void> {
 
   const defaultUsers = [
     { userId: 'user_admin', orgId: 'org_core', includedCreditMicros: 10000000, walletMicros: 100000000, updatedAt: new Date() },
-    { userId: 'user_demo', orgId: 'org_default', includedCreditMicros: 10000000, walletMicros: 5000000, updatedAt: new Date() },
+    { userId: 'user_demo', orgId: 'org_core', includedCreditMicros: 10000000, walletMicros: 5000000, updatedAt: new Date() },
   ];
 
   for (const u of defaultUsers) {

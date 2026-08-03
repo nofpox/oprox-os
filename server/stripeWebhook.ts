@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import Stripe from 'stripe';
 import { logSecurityAudit } from './audit';
+import { processBillingWebhookEvent } from '../src/lib/billing';
 
 const router = express.Router();
 
@@ -15,7 +16,7 @@ export function getStripeClient(): Stripe {
 router.post(
   '/api/webhooks/stripe',
   express.raw({ type: 'application/json' }),
-  (req: Request, res: Response) => {
+  async (req: Request, res: Response) => {
     const signature = req.headers['stripe-signature'];
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -40,7 +41,13 @@ router.post(
       return res.status(400).json({ error: `Signature Verification Failed: ${err.message}` });
     }
 
-    // Process valid constructed event
+    // Process valid constructed event idempotently
+    const idempotency = await processBillingWebhookEvent({ id: event.id, type: event.type, data: event.data });
+    if (idempotency.duplicate) {
+      console.log(`[STRIPE WEBHOOK IDEMPOTENT SKIP] Event ID: ${event.id}`);
+      return res.json({ received: true, id: event.id, type: event.type, idempotent: true });
+    }
+
     console.log(`[STRIPE WEBHOOK VERIFIED] Event ID: ${event.id} | Type: ${event.type}`);
 
     logSecurityAudit('PRIVILEGED_ADMIN_ACTION', { ip: req.ip, path: req.path, method: req.method }, {
@@ -49,7 +56,7 @@ router.post(
       eventType: event.type,
     });
 
-    res.json({ received: true, id: event.id, type: event.type });
+    res.json({ received: true, id: event.id, type: event.type, idempotent: false });
   }
 );
 

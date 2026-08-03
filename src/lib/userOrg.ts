@@ -89,19 +89,20 @@ export async function getOrganizationById(orgId: string) {
 }
 
 export async function getOrganizationMemberCount(orgId: string): Promise<number> {
+  let memCount = 0;
+  for (const m of memoryDb.organizationMembers) {
+    if (m.orgId === orgId) memCount++;
+  }
+
   if (db) {
     try {
       const rows = await db.select().from(organizationMembersTable).where(eq(organizationMembersTable.orgId, orgId));
-      return rows.length;
+      return Math.max(rows.length, memCount);
     } catch {
       // Fallback
     }
   }
-  let count = 0;
-  for (const m of memoryDb.organizationMembers) {
-    if (m.orgId === orgId) count++;
-  }
-  return count;
+  return memCount;
 }
 
 export async function assertCanAddUserToOrg(orgId: string): Promise<{ canAdd: boolean; currentCount: number; maxSeats: number }> {

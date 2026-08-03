@@ -1,6 +1,6 @@
 import { db, memoryDb } from "../db";
 import { localInvoicesTable, LocalInvoiceRow } from "../db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 
 export interface VatCalculationResult {
   subtotalHalalas: number;
@@ -26,39 +26,35 @@ export function calculateSaudiVat(subtotalHalalas: number, vatRateBps: number = 
   };
 }
 
-let invoiceCounter = 1;
-
 export async function generateSequentialInvoiceNumber(): Promise<string> {
   const year = new Date().getFullYear();
-  let maxSeq = invoiceCounter;
+  let seqVal = 0;
 
   if (db) {
     try {
-      const rows = await db.select().from(localInvoicesTable).orderBy(desc(localInvoicesTable.createdAt)).limit(10);
-      for (const row of rows) {
-        if (row.sequentialNumber && row.sequentialNumber.startsWith(`INV-${year}-`)) {
-          const numPart = parseInt(row.sequentialNumber.replace(`INV-${year}-`, ""), 10);
-          if (!isNaN(numPart) && numPart >= maxSeq) {
-            maxSeq = numPart + 1;
-          }
-        }
+      const result = await db.execute(sql`
+        INSERT INTO invoice_sequences (year, last_value)
+        VALUES (${year}, 1)
+        ON CONFLICT (year) DO UPDATE
+        SET last_value = invoice_sequences.last_value + 1
+        RETURNING last_value
+      `);
+      const rows = (result.rows || result) as any[];
+      if (rows && rows.length > 0 && rows[0].last_value != null) {
+        seqVal = Number(rows[0].last_value);
       }
     } catch {
-      // Fallback
-    }
-  } else {
-    for (const inv of memoryDb.invoices.values()) {
-      if (inv.sequentialNumber && inv.sequentialNumber.startsWith(`INV-${year}-`)) {
-        const numPart = parseInt(inv.sequentialNumber.replace(`INV-${year}-`, ""), 10);
-        if (!isNaN(numPart) && numPart >= maxSeq) {
-          maxSeq = numPart + 1;
-        }
-      }
+      // Fallback below if sequence table doesn't exist yet or query fails
     }
   }
 
-  invoiceCounter = maxSeq + 1;
-  const padded = String(maxSeq).padStart(6, "0");
+  if (seqVal === 0) {
+    const currentSeq = memoryDb.invoiceSequences.get(year) || 0;
+    seqVal = currentSeq + 1;
+    memoryDb.invoiceSequences.set(year, seqVal);
+  }
+
+  const padded = String(seqVal).padStart(6, "0");
   return `INV-${year}-${padded}`;
 }
 

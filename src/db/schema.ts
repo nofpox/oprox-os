@@ -249,7 +249,7 @@ export const localInvoicesTable = pgTable(
   "local_invoices",
   {
     id: text("id").primaryKey(), // Stripe in_xxx or inv_xxx
-    sequentialNumber: text("sequential_number").notNull().default("INV-2026-000001"),
+    sequentialNumber: text("sequential_number").notNull().unique(),
     invoiceType: text("invoice_type").notNull().default("B2C_SIMPLIFIED_INVOICE"), // "B2B_TAX_INVOICE" | "B2C_SIMPLIFIED_INVOICE"
     stripeCustomerId: text("stripe_customer_id"),
     userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
@@ -367,11 +367,18 @@ export const couponsTable = pgTable("coupons", {
 
 export type CouponRow = typeof couponsTable.$inferSelect;
 
+export const invoiceSequencesTable = pgTable("invoice_sequences", {
+  year: integer("year").primaryKey(),
+  lastValue: integer("last_value").notNull().default(0),
+});
+
+export type InvoiceSequenceRow = typeof invoiceSequencesTable.$inferSelect;
+
 export const billingEventsTable = pgTable(
   "billing_events",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    stripeEventId: text("stripe_event_id"),
+    stripeEventId: text("stripe_event_id").unique(),
     eventType: text("event_type").notNull(),
     payload: jsonb("payload").default({}),
     processed: boolean("processed").notNull().default(true),

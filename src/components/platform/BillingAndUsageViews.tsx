@@ -163,14 +163,14 @@ export const BillingAndUsageViews: React.FC<BillingViewsProps> = ({ viewId, them
           {[
             {
               title: 'Developer Pro',
-              price: billingCycle === 'annually' ? '$290 / mo' : '$350 / mo',
+              price: 'Pricing TBD',
               desc: 'Ideal for small software engineering teams.',
               features: ['5,000,000 AI Tokens', '5 Team Member Seats', 'Basic Support', 'Cloud Run Deployments'],
               isCurrent: false
             },
             {
               title: 'Enterprise Ultimate',
-              price: billingCycle === 'annually' ? '$1,450 / mo' : '$1,750 / mo',
+              price: 'Pricing TBD',
               desc: 'For scaling companies requiring autonomous AI agent swarms.',
               features: ['50,000,000 AI Tokens', '50 Team Member Seats', '24/7 Dedicated SLA Support', 'SOC2 Compliance & Okta SSO', 'Unlimited Solution Studios'],
               isCurrent: true

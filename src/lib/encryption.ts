@@ -4,10 +4,11 @@ import { logSecurityAudit } from './audit';
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12; // 96 bits recommended for GCM
 const AUTH_TAG_LENGTH = 16;
-const DEFAULT_FALLBACK_SECRET = 'oprox-os-master-encryption-key-default-2026';
+
+let runtimeDevKeyBuffer: Buffer | null = null;
 
 /**
- * Derives a 256-bit Key from the environment variable or master secret fallback
+ * Derives a 256-bit Key from the environment variable or runtime ephemeral key
  */
 function getMasterKey(): Buffer {
   const isProduction = process.env.NODE_ENV === 'production';
@@ -18,11 +19,15 @@ function getMasterKey(): Buffer {
     throw new Error('FATAL SECURITY ERROR: MASTER_ENCRYPTION_KEY environment variable is required in production mode.');
   }
 
-  const masterKeyInput = envKey || DEFAULT_FALLBACK_SECRET;
-  if (!envKey) {
-    console.warn('[SECURITY WARNING] MASTER_ENCRYPTION_KEY is not explicitly set in environment. Falling back to key derivation from default system secret.');
+  if (envKey && envKey.trim().length > 0) {
+    return crypto.pbkdf2Sync(envKey, 'oprox_os_salt_v2', 100000, 32, 'sha256');
   }
-  return crypto.pbkdf2Sync(masterKeyInput, 'oprox_os_salt_v2', 100000, 32, 'sha256');
+
+  // Non-production fallback: generate a process-runtime ephemeral key (never hardcoded/committed)
+  if (!runtimeDevKeyBuffer) {
+    runtimeDevKeyBuffer = crypto.randomBytes(32);
+  }
+  return runtimeDevKeyBuffer;
 }
 
 /**

@@ -19,8 +19,8 @@ const router = Router();
 // Mock users database for Phase 1 Auth
 const USERS_DB = [
   { id: 'usr_super', email: 'superadmin@oprox.io', role: 'superadmin' as const, orgId: 'org_core' },
-  { id: 'usr_admin', email: 'admin@oprox.io', role: 'admin' as const, orgId: 'org_default' },
-  { id: 'usr_user', email: 'user@oprox.io', role: 'user' as const, orgId: 'org_default' },
+  { id: 'usr_admin', email: 'admin@oprox.io', role: 'admin' as const, orgId: 'org_core' },
+  { id: 'usr_user', email: 'user@oprox.io', role: 'user' as const, orgId: 'org_core' },
 ];
 
 // 1. Authentication Routes
@@ -103,7 +103,10 @@ router.post('/admin/costguard', requireAuth, requireRole('superadmin'), adminRat
 });
 
 router.get('/admin/ai-wallet/balance', requireAuth, adminRateLimiter, async (req: AuthRequest, res: Response) => {
-  const walletId = req.user?.orgId || req.user?.id || 'org_default';
+  const walletId = req.user?.orgId || req.user?.id;
+  if (!walletId) {
+    return res.status(400).json({ error: 'Missing tenant or user context for wallet balance.' });
+  }
   const balanceMicros = await getWalletBalance(walletId);
   res.json({ walletId, balanceMicros, balanceUsd: balanceMicros / 1000000 });
 });
@@ -190,7 +193,7 @@ router.get('/admin/dual-approvals', requireAuth, requireRole('admin'), adminRate
   res.json({ requests });
 });
 
-router.post('/admin/dual-approvals', requireAuth, requireRole('admin'), adminRateLimiter, async (req: AuthRequest, res: Response) => {
+router.post('/admin/dual-approvals', requireAuth, requireRole('superadmin'), adminRateLimiter, async (req: AuthRequest, res: Response) => {
   try {
     const request = await createDualApprovalRequest({
       actionType: req.body.actionType || 'SENSITIVE_FINANCIAL_ACTION',
@@ -204,7 +207,7 @@ router.post('/admin/dual-approvals', requireAuth, requireRole('admin'), adminRat
   }
 });
 
-router.post('/admin/dual-approvals/:id/approve', requireAuth, requireRole('admin'), adminRateLimiter, async (req: AuthRequest, res: Response) => {
+router.post('/admin/dual-approvals/:id/approve', requireAuth, requireRole('superadmin'), adminRateLimiter, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const result = await approveDualApprovalRequest(id, req.user!.id, req.body.note);
@@ -214,10 +217,10 @@ router.post('/admin/dual-approvals/:id/approve', requireAuth, requireRole('admin
   }
 });
 
-router.post('/admin/dual-approvals/:id/reject', requireAuth, requireRole('admin'), adminRateLimiter, async (req: AuthRequest, res: Response) => {
+router.post('/admin/dual-approvals/:id/reject', requireAuth, requireRole('superadmin'), adminRateLimiter, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const request = await rejectDualApprovalRequest(id, req.user!.id, req.body.note || 'Rejected by admin');
+    const request = await rejectDualApprovalRequest(id, req.user!.id, req.body.note || 'Rejected by superadmin');
     res.json({ success: true, request });
   } catch (err: any) {
     res.status(400).json({ error: err?.message || 'Failed to reject dual approval request.' });

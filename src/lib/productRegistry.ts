@@ -44,16 +44,18 @@ export async function getCentralFinancialOverview() {
   let totalRevenueCents = invoices.reduce((sum, inv) => sum + (inv.amountPaid || 0), 0);
 
   const products = Array.from(memoryDb.productRegistry.values());
+  const totalRevenueUsd = totalRevenueCents / 100;
 
   return {
-    mrrUsd: activeSubscriptions * 299, // Estimated MRR
-    arrUsd: activeSubscriptions * 299 * 12, // Estimated ARR
+    pricingStatus: 'pricing_not_configured',
+    mrrUsd: 0, // Unset until official catalog prices are configured
+    arrUsd: 0,
     activeSubscriptionsCount: activeSubscriptions,
-    totalRevenueUsd: totalRevenueCents / 100,
+    totalRevenueUsd,
     outstandingInvoicesCount: invoices.filter((i) => i.status === 'open').length,
     failedPaymentsCount: invoices.filter((i) => i.status === 'uncollectible').length,
     totalAiProviderCostUsd: aiStats.totalCostUsd,
-    netEcosystemMarginUsd: activeSubscriptions * 299 - aiStats.totalCostUsd,
+    netEcosystemMarginUsd: totalRevenueUsd - aiStats.totalCostUsd,
     productsSummary: products.map((p) => ({
       name: p.name,
       slug: p.slug,

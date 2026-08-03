@@ -84,89 +84,109 @@ export async function getAllDualApprovalRequests(): Promise<DualApprovalRequestR
   return Array.from(memoryDb.dualApprovalRequests.values());
 }
 
+const requestLocks = new Map<string, Promise<void>>();
+
+async function acquireRequestLock<T>(requestId: string, fn: () => Promise<T>): Promise<T> {
+  let resolver: () => void;
+  const currentLock = requestLocks.get(requestId) || Promise.resolve();
+  const nextLock = new Promise<void>((resolve) => {
+    resolver = resolve;
+  });
+  requestLocks.set(requestId, currentLock.then(() => nextLock));
+
+  try {
+    await currentLock;
+    return await fn();
+  } finally {
+    resolver!();
+  }
+}
+
 export async function approveDualApprovalRequest(
   requestId: string,
   approverUserId: string,
   note?: string
 ): Promise<{ success: boolean; status: string; message: string; request: DualApprovalRequestRow }> {
-  const req = await getDualApprovalRequestById(requestId);
-  if (!req) {
-    throw new Error(`Dual approval request '${requestId}' not found.`);
-  }
-
-  if (req.status !== "PENDING") {
-    return {
-      success: false,
-      status: req.status,
-      message: `Request '${requestId}' is already in '${req.status}' state.`,
-      request: req,
-    };
-  }
-
-  // STRICT POLICY: A requester cannot approve their own request
-  if (approverUserId === req.requestedBy) {
-    throw new Error("Self-approval is forbidden by OPROX Dual Approval Policy. Independent second approval is required.");
-  }
-
-  const now = new Date();
-  let updatedStatus = "PENDING";
-  let firstBy = req.firstApprovedBy;
-  let firstAt = req.firstApprovedAt;
-  let secondBy = req.secondApprovedBy;
-  let secondAt = req.secondApprovedAt;
-  let executedAt = req.executedAt;
-
-  if (!firstBy) {
-    firstBy = approverUserId;
-    firstAt = now;
-  } else if (firstBy === approverUserId) {
-    throw new Error("Approver has already registered the first approval. Second independent approver required.");
-  } else if (!secondBy) {
-    secondBy = approverUserId;
-    secondAt = now;
-    updatedStatus = "APPROVED";
-    executedAt = now;
-  }
-
-  const updatedRecord: DualApprovalRequestRow = {
-    ...req,
-    status: updatedStatus,
-    firstApprovedBy: firstBy,
-    firstApprovedAt: firstAt,
-    secondApprovedBy: secondBy,
-    secondApprovedAt: secondAt,
-    executedAt,
-    rejectionNote: note || req.rejectionNote,
-  };
-
-  if (db) {
-    try {
-      await db.insert(dualApprovalRequestsTable).values(updatedRecord).onConflictDoUpdate({
-        target: dualApprovalRequestsTable.id,
-        set: updatedRecord,
-      });
-    } catch {
-      // Fallback
+  return acquireRequestLock(requestId, async () => {
+    const req = await getDualApprovalRequestById(requestId);
+    if (!req) {
+      throw new Error(`Dual approval request '${requestId}' not found.`);
     }
-  }
 
-  memoryDb.dualApprovalRequests.set(requestId, updatedRecord);
+    if (req.status !== "PENDING") {
+      return {
+        success: false,
+        status: req.status,
+        message: `Request '${requestId}' is already in '${req.status}' state.`,
+        request: req,
+      };
+    }
 
-  await logAuditEvent({
-    orgId: null,
-    actorId: approverUserId,
-    action: updatedStatus === "APPROVED" ? "DUAL_APPROVAL_COMPLETED" : "DUAL_APPROVAL_FIRST_RECORDED",
-    targetType: "FINANCIAL_REQUEST",
-    targetId: requestId,
-    metadata: { status: updatedStatus, approverUserId, actionType: req.actionType },
+    // STRICT POLICY: A requester cannot approve their own request
+    if (approverUserId === req.requestedBy) {
+      throw new Error("Self-approval is forbidden by OPROX Dual Approval Policy. Independent second approval is required.");
+    }
+
+    const now = new Date();
+    let updatedStatus = "PENDING";
+    let firstBy = req.firstApprovedBy;
+    let firstAt = req.firstApprovedAt;
+    let secondBy = req.secondApprovedBy;
+    let secondAt = req.secondApprovedAt;
+    let executedAt = req.executedAt;
+
+    if (!firstBy) {
+      firstBy = approverUserId;
+      firstAt = now;
+    } else if (firstBy === approverUserId) {
+      throw new Error("Approver has already registered the first approval. Second independent approver required.");
+    } else if (!secondBy) {
+      secondBy = approverUserId;
+      secondAt = now;
+      updatedStatus = "APPROVED";
+      executedAt = now;
+    }
+
+    const updatedRecord: DualApprovalRequestRow = {
+      ...req,
+      status: updatedStatus,
+      firstApprovedBy: firstBy,
+      firstApprovedAt: firstAt,
+      secondApprovedBy: secondBy,
+      secondApprovedAt: secondAt,
+      executedAt,
+      rejectionNote: note || req.rejectionNote,
+    };
+
+    if (db) {
+      try {
+        await db.insert(dualApprovalRequestsTable).values(updatedRecord).onConflictDoUpdate({
+          target: dualApprovalRequestsTable.id,
+          set: updatedRecord,
+        });
+      } catch {
+        // Fallback
+      }
+    }
+
+    memoryDb.dualApprovalRequests.set(requestId, updatedRecord);
+
+    await logAuditEvent({
+      orgId: null,
+      actorId: approverUserId,
+      action: updatedStatus === "APPROVED" ? "DUAL_APPROVAL_COMPLETED" : "DUAL_APPROVAL_FIRST_RECORDED",
+      targetType: "FINANCIAL_REQUEST",
+      targetId: requestId,
+      metadata: { status: updatedStatus, approverUserId, actionType: req.actionType },
+    });
+
+    return {
+      success: true,
+      status: updatedStatus,
+      message: updatedStatus === "APPROVED" ? "Request fully approved by dual controls and executed." : "First approval recorded. Pending second independent approver.",
+      request: updatedRecord,
+    };
   });
-
-  return {
-    success: true,
-    status: updatedStatus,
-    message: updatedStatus === "APPROVED" ? "Request fully approved by dual controls and executed." : "First approval recorded. Pending second independent approver.",
-    request: updatedRecord,
-  };
 }
 
 export async function rejectDualApprovalRequest(

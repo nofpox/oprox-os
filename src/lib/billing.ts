@@ -464,26 +464,51 @@ export async function updatePaymentProviderConfig(updates: Partial<typeof memory
   return memoryDb.paymentProviderConfig;
 }
 
-export async function handleStripeWebhook(event: { id: string; type: string; data: any }) {
-  const billingEvent = {
-    id: `evt_${Date.now()}`,
-    stripeEventId: event.id || `evt_${Date.now()}`,
-    eventType: event.type,
-    payload: event.data || {},
-    processed: true,
-    createdAt: new Date(),
-  };
-
+export async function processBillingWebhookEvent(evt: { id: string; type: string; data?: any }): Promise<{ processed: boolean; duplicate: boolean }> {
   if (db) {
     try {
-      await db.transaction(async (tx: any) => {
-        await tx.insert(billingEventsTable).values(billingEvent as any);
-      });
+      const existing = await db.select().from(billingEventsTable).where(eq(billingEventsTable.stripeEventId, evt.id)).limit(1);
+      if (existing.length > 0) {
+        return { processed: true, duplicate: true };
+      }
     } catch {
       // Fallback
     }
   }
-  memoryDb.billingEvents.push(billingEvent as any);
-  return { received: true, eventId: billingEvent.stripeEventId };
+
+  const memExisting = memoryDb.billingEvents.find((e) => e.stripeEventId === evt.id);
+  if (memExisting) {
+    return { processed: true, duplicate: true };
+  }
+
+  const record = {
+    id: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    stripeEventId: evt.id,
+    eventType: evt.type,
+    payload: evt.data || {},
+    processed: true,
+    createdAt: new Date(),
+  };
+
+  memoryDb.billingEvents.push(record as any);
+
+  if (db) {
+    try {
+      await db.insert(billingEventsTable).values(record as any);
+    } catch {
+      // Unique constraint violation in DB indicates duplicate
+      return { processed: true, duplicate: true };
+    }
+  }
+
+  return { processed: true, duplicate: false };
+}
+
+export async function handleStripeWebhook(event: { id: string; type: string; data: any }) {
+  const idempotency = await processBillingWebhookEvent(event);
+  if (idempotency.duplicate) {
+    return { received: true, eventId: event.id, duplicate: true };
+  }
+  return { received: true, eventId: event.id, duplicate: false };
 }
 

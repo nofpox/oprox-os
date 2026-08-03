@@ -53,6 +53,7 @@ class MemoryDbStore {
   // Phase 2: Billing & Subscriptions
   subscriptions = new Map<string, schema.SubscriptionRow>();
   invoices = new Map<string, schema.LocalInvoiceRow>();
+  invoiceSequences = new Map<number, number>();
   coupons = new Map<string, schema.CouponRow>();
   billingEvents: schema.BillingEventRow[] = [];
   paymentProviderConfig: schema.PaymentProviderConfigRow = {

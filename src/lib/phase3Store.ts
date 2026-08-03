@@ -333,6 +333,9 @@ let cachedTestState: RealTestState | null = null;
  * Coverage is 'NOT_MEASURED' unless actual coverage output exists.
  */
 export function runOrFetchRealTestState(forceRun = false): RealTestState {
+  const resultsPath = path.resolve(process.cwd(), '.vitest-results.json');
+  const coveragePath = path.resolve(process.cwd(), 'coverage/coverage-summary.json');
+
   const isTestEnv = process.env.VITEST === 'true' || process.env.NODE_ENV === 'test';
   if (isTestEnv) {
     return {

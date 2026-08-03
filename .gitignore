@@ -7,4 +7,5 @@ coverage/
 .env*
 !.env.example
 .phase3_store.json
+.phase4_store.json
 *.tar.gz

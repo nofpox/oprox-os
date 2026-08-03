@@ -43,6 +43,9 @@ import { LiveWorkspaceSync } from './LiveWorkspaceSync';
 import { AiReleaseManager } from './AiReleaseManager';
 import { EndToEndLifecycleEngine } from './EndToEndLifecycleEngine';
 
+// Phase 4 Components
+import { ProductionDeliveryEngine } from './ProductionDeliveryEngine';
+
 interface OproxCodeAiSuiteProps {
   theme?: 'dark' | 'light';
   activeProjectTitle?: string;
@@ -58,8 +61,8 @@ export const OproxCodeAiSuite: React.FC<OproxCodeAiSuiteProps> = ({
 }) => {
   const isDark = theme === 'dark';
 
-  const [activePhase, setActivePhase] = useState<'phase1' | 'phase2' | 'phase3'>('phase3');
-  const [activeModule, setActiveModule] = useState<string>('lifecycle');
+  const [activePhase, setActivePhase] = useState<'phase1' | 'phase2' | 'phase3' | 'phase4'>('phase4');
+  const [activeModule, setActiveModule] = useState<string>('delivery');
 
   const phase1Modules = [
     {
@@ -189,8 +192,24 @@ export const OproxCodeAiSuite: React.FC<OproxCodeAiSuiteProps> = ({
     },
   ];
 
+  const phase4Modules = [
+    {
+      id: 'delivery',
+      name: 'Delivery & Operations',
+      icon: <Rocket className="w-4 h-4" />,
+      badge: 'Phase 4 Live',
+      desc: 'Deployment orchestration, release gate, migration safety, health inspection, incident & rollback.'
+    },
+  ];
+
   const currentModules =
-    activePhase === 'phase3' ? phase3Modules : activePhase === 'phase2' ? phase2Modules : phase1Modules;
+    activePhase === 'phase4'
+      ? phase4Modules
+      : activePhase === 'phase3'
+      ? phase3Modules
+      : activePhase === 'phase2'
+      ? phase2Modules
+      : phase1Modules;
 
   return (
     <div className={`min-h-screen p-4 sm:p-6 space-y-6 transition-colors duration-200 ${
@@ -258,7 +277,20 @@ export const OproxCodeAiSuite: React.FC<OproxCodeAiSuiteProps> = ({
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                Phase 3: Autonomous Lifecycle
+                Phase 3: Lifecycle
+              </button>
+              <button
+                onClick={() => {
+                  setActivePhase('phase4');
+                  setActiveModule('delivery');
+                }}
+                className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                  activePhase === 'phase4'
+                    ? 'bg-teal-400 text-slate-950 shadow-lg shadow-teal-400/20'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Phase 4: Autonomous Operations
               </button>
             </div>
 
@@ -447,6 +479,14 @@ export const OproxCodeAiSuite: React.FC<OproxCodeAiSuiteProps> = ({
 
         {activeModule === 'release' && (
           <AiReleaseManager
+            theme={theme}
+          />
+        )}
+
+        {/* Phase 4 Modules */}
+        {activeModule === 'delivery' && (
+          <ProductionDeliveryEngine
+            projectTitle={activeProjectTitle}
             theme={theme}
           />
         )}

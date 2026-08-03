@@ -646,3 +646,175 @@ export const phase3LifecycleTable = pgTable("phase3_lifecycle", {
 
 export type Phase3LifecycleRow = typeof phase3LifecycleTable.$inferSelect;
 
+// ── Phase 4: Production Delivery, Deployment & Governance ─────────────────
+export const phase4DeploymentConfigsTable = pgTable("phase4_deployment_configs", {
+  tenantId: text("tenant_id").primaryKey(),
+  provider: text("provider").notNull().default("cloudrun"), // cloudrun | vercel | docker | custom
+  environment: text("environment").notNull().default("production"), // development | preview | staging | production
+  deploymentTarget: text("deployment_target").notNull().default("cloudrun"),
+  buildSettings: jsonb("build_settings").notNull().default({}),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type Phase4DeploymentConfigRow = typeof phase4DeploymentConfigsTable.$inferSelect;
+
+export const phase4DeploymentsTable = pgTable(
+  "phase4_deployments",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    environment: text("environment").notNull().default("production"),
+    releaseVersion: text("release_version").notNull(),
+    gitSha: text("git_sha").notNull(),
+    provider: text("provider").notNull(),
+    status: text("status").notNull().default("NOT_CONFIGURED"), // NOT_CONFIGURED | DEPLOYING | VERIFYING | HEALTHY | DEGRADED | FAILED | CANCELLED
+    logs: jsonb("logs").notNull().default([]),
+    initiatedBy: text("initiated_by").notNull(),
+    startedAt: timestamp("started_at").notNull().defaultNow(),
+    completedAt: timestamp("completed_at"),
+    failureReason: text("failure_reason"),
+  },
+  (t) => [
+    index("phase4_deployments_tenant_idx").on(t.tenantId),
+    index("phase4_deployments_status_idx").on(t.status),
+  ]
+);
+
+export type Phase4DeploymentRow = typeof phase4DeploymentsTable.$inferSelect;
+
+export const phase4RevisionsTable = pgTable(
+  "phase4_revisions",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    environment: text("environment").notNull().default("production"),
+    revisionId: text("revision_id").notNull(),
+    gitSha: text("git_sha").notNull(),
+    imageTag: text("image_tag"),
+    status: text("status").notNull().default("active"),
+    isKnownGood: boolean("is_known_good").notNull().default(false),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("phase4_revisions_tenant_idx").on(t.tenantId)]
+);
+
+export type Phase4RevisionRow = typeof phase4RevisionsTable.$inferSelect;
+
+export const phase4ReleaseGatesTable = pgTable(
+  "phase4_release_gates",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    environment: text("environment").notNull().default("production"),
+    gitSha: text("git_sha").notNull(),
+    decision: text("decision").notNull().default("NO_GO"), // GO | NO_GO | NOT_CONFIGURED
+    blockingReasons: jsonb("blocking_reasons").notNull().default([]),
+    checks: jsonb("checks").notNull().default({}),
+    evaluatedAt: timestamp("evaluated_at").notNull().defaultNow(),
+  },
+  (t) => [index("phase4_release_gates_tenant_idx").on(t.tenantId)]
+);
+
+export type Phase4ReleaseGateRow = typeof phase4ReleaseGatesTable.$inferSelect;
+
+export const phase4HealthChecksTable = pgTable(
+  "phase4_health_checks",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    environment: text("environment").notNull().default("production"),
+    endpoint: text("endpoint").notNull(),
+    status: text("status").notNull().default("NOT_MEASURED"), // HEALTHY | DEGRADED | FAILED | NOT_MEASURED | NOT_CONFIGURED
+    httpCode: integer("http_code"),
+    latencyMs: integer("latency_ms"),
+    details: jsonb("details").notNull().default({}),
+    checkedAt: timestamp("checked_at").notNull().defaultNow(),
+  },
+  (t) => [index("phase4_health_checks_tenant_idx").on(t.tenantId)]
+);
+
+export type Phase4HealthCheckRow = typeof phase4HealthChecksTable.$inferSelect;
+
+export const phase4MigrationHistoryTable = pgTable(
+  "phase4_migration_history",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    environment: text("environment").notNull().default("production"),
+    migrationName: text("migration_name").notNull(),
+    isDestructive: boolean("is_destructive").notNull().default(false),
+    actorId: text("actor_id").notNull(),
+    confirmedBy: text("confirmed_by"),
+    status: text("status").notNull().default("APPLIED"), // APPLIED | BLOCKED | REVERTED | FAILED
+    executedAt: timestamp("executed_at").notNull().defaultNow(),
+  },
+  (t) => [index("phase4_migration_history_tenant_idx").on(t.tenantId)]
+);
+
+export type Phase4MigrationHistoryRow = typeof phase4MigrationHistoryTable.$inferSelect;
+
+export const phase4IncidentsTable = pgTable(
+  "phase4_incidents",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    environment: text("environment").notNull().default("production"),
+    failureCategory: text("failure_category").notNull(), // BUILD_FAILURE | TEST_FAILURE | SECURITY_GATE_FAILURE | MIGRATION_FAILURE | DEPLOYMENT_FAILURE | HEALTH_CHECK_FAILURE | SMOKE_TEST_FAILURE | PROVIDER_FAILURE | CONFIGURATION_FAILURE
+    summary: text("summary").notNull(),
+    evidence: jsonb("evidence").notNull().default({}),
+    status: text("status").notNull().default("OPEN"), // OPEN | INVESTIGATING | RESOLVED | MITIGATED
+    remediation: text("remediation"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    resolvedAt: timestamp("resolved_at"),
+  },
+  (t) => [index("phase4_incidents_tenant_idx").on(t.tenantId)]
+);
+
+export type Phase4IncidentRow = typeof phase4IncidentsTable.$inferSelect;
+
+export const phase4RollbacksTable = pgTable(
+  "phase4_rollbacks",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    environment: text("environment").notNull().default("production"),
+    targetRevisionId: text("target_revision_id").notNull(),
+    fromRevisionId: text("from_revision_id").notNull(),
+    reason: text("reason").notNull(),
+    initiatedBy: text("initiated_by").notNull(),
+    status: text("status").notNull().default("EXECUTED"), // EXECUTED | FAILED | REJECTED
+    verificationResult: text("verification_result").notNull().default("NOT_VERIFIED"), // HEALTHY | DEGRADED | FAILED | NOT_VERIFIED
+    executedAt: timestamp("executed_at").notNull().defaultNow(),
+  },
+  (t) => [index("phase4_rollbacks_tenant_idx").on(t.tenantId)]
+);
+
+export type Phase4RollbackRow = typeof phase4RollbacksTable.$inferSelect;
+
+export const phase4EnvConfigsTable = pgTable(
+  "phase4_env_configs",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    environment: text("environment").notNull().default("production"), // development | preview | staging | production
+    varKey: text("var_key").notNull(),
+    status: text("status").notNull().default("CONFIGURED"), // CONFIGURED | MISSING | INVALID_REFERENCE
+    isRequired: boolean("is_required").notNull().default(true),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("phase4_env_tenant_env_key_uniq").on(t.tenantId, t.environment, t.varKey),
+    index("phase4_env_tenant_idx").on(t.tenantId),
+  ]
+);
+
+export type Phase4EnvConfigRow = typeof phase4EnvConfigsTable.$inferSelect;
+
+

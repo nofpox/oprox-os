@@ -465,61 +465,81 @@ export async function updatePaymentProviderConfig(updates: Partial<typeof memory
   return memoryDb.paymentProviderConfig;
 }
 
+const eventLocks = new Map<string, Promise<void>>();
+
+async function acquireEventLock<T>(eventId: string, fn: () => Promise<T>): Promise<T> {
+  let resolver: () => void;
+  const currentLock = eventLocks.get(eventId) || Promise.resolve();
+  const nextLock = new Promise<void>((resolve) => {
+    resolver = resolve;
+  });
+  eventLocks.set(eventId, currentLock.then(() => nextLock));
+
+  try {
+    await currentLock;
+    return await fn();
+  } finally {
+    resolver!();
+  }
+}
+
 export async function processBillingWebhookEvent(evt: { id: string; type: string; data?: any }): Promise<{ processed: boolean; duplicate: boolean }> {
-  if (db) {
-    try {
-      const existing = await db.select().from(billingEventsTable).where(eq(billingEventsTable.stripeEventId, evt.id)).limit(1);
-      if (existing.length > 0) {
-        return { processed: true, duplicate: true };
-      }
-    } catch {
-      // Fallback
-    }
-  }
-
-  const memExisting = memoryDb.billingEvents.find((e) => e.stripeEventId === evt.id);
-  if (memExisting) {
-    return { processed: true, duplicate: true };
-  }
-
-  const record = {
-    id: randomUUID(),
-    stripeEventId: evt.id,
-    eventType: evt.type,
-    payload: evt.data || {},
-    processed: true,
-    createdAt: new Date(),
-  };
-
-  if (db) {
-    try {
-      await db.insert(billingEventsTable).values(record as any);
-    } catch (err: any) {
-      // Only PostgreSQL UNIQUE constraint violation (code 23505) indicates duplicate event insertion race
-      const isUniqueViolation = err && (
-        err.code === '23505' ||
-        err.constraint?.includes('stripe_event_id') ||
-        (typeof err.message === 'string' && (err.message.includes('unique constraint') || err.message.includes('duplicate key')))
-      );
-
-      if (isUniqueViolation) {
-        if (!memoryDb.billingEvents.some((e) => e.stripeEventId === evt.id)) {
-          memoryDb.billingEvents.push(record as any);
+  return acquireEventLock(evt.id, async () => {
+    if (db) {
+      try {
+        const existing = await db.select().from(billingEventsTable).where(eq(billingEventsTable.stripeEventId, evt.id)).limit(1);
+        if (existing.length > 0) {
+          return { processed: true, duplicate: true };
         }
-        return { processed: true, duplicate: true };
+      } catch {
+        // Fallback
       }
-
-      // Any non-unique database error must NOT be classified as duplicate!
-      console.error('[DATABASE ERROR] Failed to insert billing event:', err);
-      throw err;
     }
-  }
 
-  if (!memoryDb.billingEvents.some((e) => e.stripeEventId === evt.id)) {
-    memoryDb.billingEvents.push(record as any);
-  }
+    const memExisting = memoryDb.billingEvents.find((e) => e.stripeEventId === evt.id);
+    if (memExisting) {
+      return { processed: true, duplicate: true };
+    }
 
-  return { processed: true, duplicate: false };
+    const record = {
+      id: randomUUID(),
+      stripeEventId: evt.id,
+      eventType: evt.type,
+      payload: evt.data || {},
+      processed: true,
+      createdAt: new Date(),
+    };
+
+    if (db) {
+      try {
+        await db.insert(billingEventsTable).values(record as any);
+      } catch (err: any) {
+        // Only PostgreSQL UNIQUE constraint violation (code 23505) indicates duplicate event insertion race
+        const isUniqueViolation = err && (
+          err.code === '23505' ||
+          err.constraint?.includes('stripe_event_id') ||
+          (typeof err.message === 'string' && (err.message.includes('unique constraint') || err.message.includes('duplicate key')))
+        );
+
+        if (isUniqueViolation) {
+          if (!memoryDb.billingEvents.some((e) => e.stripeEventId === evt.id)) {
+            memoryDb.billingEvents.push(record as any);
+          }
+          return { processed: true, duplicate: true };
+        }
+
+        // Any non-unique database error must NOT be classified as duplicate!
+        console.error('[DATABASE ERROR] Failed to insert billing event:', err);
+        throw err;
+      }
+    }
+
+    if (!memoryDb.billingEvents.some((e) => e.stripeEventId === evt.id)) {
+      memoryDb.billingEvents.push(record as any);
+    }
+
+    return { processed: true, duplicate: false };
+  });
 }
 
 export async function handleStripeWebhook(event: { id: string; type: string; data: any }) {

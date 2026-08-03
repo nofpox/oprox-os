@@ -1,6 +1,6 @@
 // Global OPROX Types
 
-export type AppMode = 'dashboard' | 'ai-os' | 'showcase' | 'ide' | 'database' | 'cloud' | 'enterprise' | 'media' | 'proptech' | 'solutions' | 'platform-suite' | 'design-system';
+export type AppMode = 'dashboard' | 'ai-os' | 'oprox-code-ai' | 'showcase' | 'ide' | 'database' | 'cloud' | 'enterprise' | 'media' | 'proptech' | 'solutions' | 'platform-suite' | 'design-system';
 
 export type SolutionCategory = 'Media & Content' | 'Real Estate & PropTech' | 'Property Management' | 'Enterprise ERP' | 'FinTech & Billing' | 'AI & Automation' | 'Developer Tools';
 
@@ -209,3 +209,143 @@ export interface MediaAsset {
   dateCreated: string;
   previewUrl?: string;
 }
+
+// OPROX Code / AI Phase 3 Types
+export interface ProjectGeneratorConfig {
+  projectName: string;
+  description: string;
+  template: 'fullstack' | 'microservices' | 'mobile' | 'api_gateway' | 'realtime_dashboard';
+  architecture: 'monolith' | 'modular_monolith' | 'microservices' | 'serverless' | 'event_driven';
+  techStack: 'react_node' | 'next_express' | 'vue_vite' | 'python_fastapi' | 'go_gin';
+  database: 'postgresql_drizzle' | 'firestore' | 'mongodb' | 'mysql' | 'sqlite';
+  auth: 'jwt' | 'oauth2' | 'firebase_auth' | 'clerk' | 'auth0';
+  deploymentTarget: 'cloud_run' | 'vercel' | 'aws_ecs' | 'docker_swarm' | 'kubernetes';
+  createdAt: string;
+}
+
+export type SpecialistAgentRole =
+  | 'architect'
+  | 'backend'
+  | 'frontend'
+  | 'mobile'
+  | 'database'
+  | 'devops'
+  | 'qa'
+  | 'security'
+  | 'documentation';
+
+export interface AgentHandoffRecord {
+  id: string;
+  fromAgent: SpecialistAgentRole;
+  toAgent: SpecialistAgentRole;
+  taskTitle: string;
+  outputSummary: string;
+  timestamp: string;
+  status: 'passed' | 'in_progress' | 'blocked';
+}
+
+export interface PipelineTaskNode {
+  id: string;
+  title: string;
+  assignedAgent: SpecialistAgentRole;
+  dependencies: string[]; // IDs of prerequisite tasks
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  retryCount: number;
+  maxRetries: number;
+  output?: string;
+  error?: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+export interface WorkspaceSyncState {
+  fileState: { totalFiles: number; dirtyFiles: number; syncStatus: 'synced' | 'syncing' | 'error' };
+  buildState: { status: 'idle' | 'building' | 'success' | 'failed'; bundleSize: string; lastBuildTime: string };
+  testState: { totalTests: number; passed: number; failed: number; coverage: string };
+  gitState: { branch: string; commitHash: string; uncommittedChanges: number };
+  deploymentState: { target: string; status: 'active' | 'deploying' | 'offline'; health: string; url: string };
+}
+
+export interface ReleaseCandidate {
+  id: string;
+  version: string; // e.g., '2.5.0-rc1'
+  semverType: 'major' | 'minor' | 'patch';
+  releaseNotes: string;
+  readinessScore: number;
+  goNoGo: 'GO' | 'NO_GO';
+  checklist: { id: string; label: string; completed: boolean }[];
+  createdAt: string;
+  status: 'draft' | 'approved' | 'released';
+}
+
+export type LifecycleStage =
+  | 'idea'
+  | 'requirements'
+  | 'planning'
+  | 'architecture'
+  | 'tasks'
+  | 'code_generation'
+  | 'patching'
+  | 'testing'
+  | 'security_review'
+  | 'documentation'
+  | 'git'
+  | 'build'
+  | 'release'
+  | 'deployment';
+
+export interface CodePatchItem {
+  id: string;
+  filePath: string;
+  action: 'create' | 'edit' | 'delete' | 'refactor';
+  originalContent: string;
+  patchedContent: string;
+  diffSummary: string;
+  timestamp: string;
+  status: 'pending' | 'applied' | 'rolled_back';
+}
+
+export interface SymbolIndexItem {
+  id: string;
+  name: string;
+  kind: 'function' | 'interface' | 'class' | 'variable' | 'type' | 'enum';
+  filePath: string;
+  line: number;
+  usagesCount: number;
+  exported: boolean;
+  signature?: string;
+}
+
+export interface CodeReviewFinding {
+  id: string;
+  category: 'Bugs' | 'Performance' | 'Security (OWASP)' | 'Maintainability' | 'Architecture' | 'Clean Code' | 'Accessibility' | 'Type Safety';
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  filePath: string;
+  line?: number;
+  title: string;
+  description: string;
+  recommendation: string;
+  codeSnippet?: string;
+  status: 'open' | 'fixed' | 'dismissed';
+}
+
+export interface GeneratedTestFile {
+  id: string;
+  title: string;
+  testType: 'unit' | 'integration' | 'api' | 'edge_case' | 'regression';
+  targetFilePath: string;
+  testFilePath: string;
+  testCode: string;
+  assertionsCount: number;
+  status: 'pending' | 'passed' | 'failed';
+}
+
+export interface DocArtifact {
+  id: string;
+  docType: 'readme' | 'api' | 'architecture' | 'deployment' | 'changelog' | 'release_notes';
+  title: string;
+  targetPath: string;
+  markdownContent: string;
+  lastGenerated: string;
+}
+

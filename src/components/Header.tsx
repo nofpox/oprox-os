@@ -53,6 +53,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   const modes: { id: AppMode; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" />, badge: 'HQ' },
+    { id: 'oprox-code-ai', label: 'OPROX Code / AI', icon: <Cpu className="w-4 h-4 text-emerald-400" />, badge: 'Phase 1' },
     { id: 'solutions', label: 'Solutions Hub', icon: <ShoppingBag className="w-4 h-4" />, badge: 'Apps' },
     { id: 'platform-suite', label: 'Platform Suite', icon: <Sliders className="w-4 h-4" />, badge: '33 Pages' },
     { id: 'ai-os', label: 'AI Studio OS', icon: <Sparkles className="w-4 h-4" />, badge: 'AI Swarm' },

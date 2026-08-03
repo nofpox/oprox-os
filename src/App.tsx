@@ -3,6 +3,7 @@ import { Header } from './components/Header';
 import { ShowcaseView } from './components/showcase/ShowcaseView';
 import { OproxCodeIDE } from './components/ide/OproxCodeIDE';
 import { AiOperatingSystem } from './components/ai/AiOperatingSystem';
+import { OproxCodeAiSuite } from './components/ai/OproxCodeAiSuite';
 import { DatabaseStudio } from './components/database/DatabaseStudio';
 import { CloudMonitors } from './components/cloud/CloudMonitors';
 import { EnterpriseOS } from './components/memory/EnterpriseOS';
@@ -82,6 +83,13 @@ export default function App() {
               initialPrompt={activePrompt}
               onLaunchIdeWithPrompt={handleLaunchIdeWithPrompt}
               theme={theme}
+            />
+          )}
+
+          {currentMode === 'oprox-code-ai' && (
+            <OproxCodeAiSuite
+              theme={theme}
+              activeProjectTitle={activeProjectTitle}
             />
           )}
 

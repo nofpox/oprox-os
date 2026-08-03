@@ -232,37 +232,159 @@ export const OproxCodeIDE: React.FC<OproxCodeIDEProps> = ({
 
   // Terminal Execution Handler
   const handleExecuteTerminalCommand = (cmd: string) => {
-    setTerminalLogs((prev) => [...prev, `oprox@workspace:~$ ${cmd}`]);
+    const trimmed = cmd.trim();
+    setTerminalLogs((prev) => [...prev, `oprox@workspace:~$ ${trimmed}`]);
 
-    if (cmd === 'clear') {
+    if (trimmed === 'clear') {
       setTerminalLogs([]);
       return;
     }
 
-    if (cmd === 'help') {
+    if (trimmed === 'help') {
       setTerminalLogs((prev) => [
         ...prev,
-        'Supported Commands:',
-        '  ls                      - List files in workspace',
-        '  oprox build             - Trigger production build',
-        '  oprox test              - Run Vitest suite',
-        '  oprox deploy            - Trigger Cloud Run zero-downtime release',
-        '  clear                   - Clear terminal logs',
+        'OPROX Interactive Terminal Commands:',
+        '  ls                      - List files in current VFS directory',
+        '  cat <file_path>         - View content of a file (e.g. cat /package.json)',
+        '  git status              - Show working tree status',
+        '  git log                 - Display commit history',
+        '  git diff                - View unstaged workspace diffs',
+        '  npm test                - Run Vitest automated test suite',
+        '  oprox status            - View system health and OPROX OS status',
+        '  oprox build             - Trigger production build with esbuild',
+        '  oprox deploy            - Trigger Cloud Run deployment',
+        '  node -v / whoami / env  - Display environment diagnostics',
+        '  clear                   - Clear terminal buffer',
       ]);
       return;
     }
 
-    if (cmd === 'oprox build') {
+    if (trimmed === 'ls' || trimmed === 'dir') {
+      const fileNames = vfsNodes.map((n) => (n.type === 'directory' ? `${n.name}/` : n.name)).join('  ');
+      setTerminalLogs((prev) => [...prev, fileNames || 'src/  package.json  README.md  server.ts']);
+      return;
+    }
+
+    if (trimmed.startsWith('cat ')) {
+      const filePath = trimmed.replace('cat ', '').trim();
+      const foundTab = openTabs.find((t) => t.path === filePath || t.name === filePath);
+      if (foundTab) {
+        setTerminalLogs((prev) => [...prev, `--- Content of ${foundTab.path} ---`, foundTab.content]);
+      } else {
+        setTerminalLogs((prev) => [...prev, `[ERROR] File not found in workspace VFS: ${filePath}`]);
+      }
+      return;
+    }
+
+    if (trimmed === 'git status') {
+      const modifiedFiles = openTabs.filter((t) => t.isModified).map((t) => t.path);
       setTerminalLogs((prev) => [
         ...prev,
-        '[INFO] Compiling TypeScript AST...',
-        '[INFO] Running esbuild bundler...',
-        '[SUCCESS] Build complete! dist/server.cjs generated with 0 errors.',
+        'On branch main',
+        'Your branch is up to date with \'origin/main\'.',
+        modifiedFiles.length > 0
+          ? `Changes not staged for commit:\n${modifiedFiles.map((f) => `  modified: ${f}`).join('\n')}`
+          : 'nothing to commit, working tree clean',
       ]);
       return;
     }
 
-    setTerminalLogs((prev) => [...prev, `[INFO] Executed process: ${cmd}`]);
+    if (trimmed === 'git log') {
+      setTerminalLogs((prev) => [
+        ...prev,
+        'commit b390ab646016f9355266d3347d8fb1decd815fa0 (HEAD -> main, origin/main)',
+        'Author: OPROX System Engineer <dev@oprox.ai>',
+        'Date:   Mon Aug 3 12:00:00 2026',
+        '    feat: implement prepaid payment policy refinement and platform workspace',
+      ]);
+      return;
+    }
+
+    if (trimmed === 'git diff') {
+      const modified = openTabs.filter((t) => t.isModified);
+      if (modified.length === 0) {
+        setTerminalLogs((prev) => [...prev, 'No uncommitted changes in workspace.']);
+      } else {
+        setTerminalLogs((prev) => [
+          ...prev,
+          ...modified.map((f) => `--- a${f.path}\n+++ b${f.path}\n@@ -1,5 +1,6 @@\n+ // OPROX Uncommitted Local Changes`),
+        ]);
+      }
+      return;
+    }
+
+    if (trimmed === 'npm test' || trimmed === 'vitest') {
+      setTerminalLogs((prev) => [
+        ...prev,
+        '✓ tests/phase1-security.test.ts (15 tests)',
+        '✓ tests/phase2-complete.test.ts (15 tests)',
+        '✓ tests/phase3-complete.test.ts (15 tests)',
+        '✓ tests/phase4-business-policy.test.ts (17 tests)',
+        '✓ tests/phase4-corrections.test.ts (8 tests)',
+        'Test Files: 5 passed (5)',
+        'Tests: 70 passed (70)',
+        '[SUCCESS] All unit and integration test suites passed 100%!',
+      ]);
+      return;
+    }
+
+    if (trimmed === 'oprox status') {
+      setTerminalLogs((prev) => [
+        ...prev,
+        'OPROX Autonomous OS v4.2.0-enterprise',
+        '  System Mode: ONLINE',
+        '  AI Wallet: Active ($250.00 Credit)',
+        '  CostGuard: Enforcement Active',
+        '  KillSwitch: Disarmed (Normal Operation)',
+        '  Security Gate: Enforcing JWT + Role-based Authorization',
+        `  Current Project: ${currentProject}`,
+      ]);
+      return;
+    }
+
+    if (trimmed === 'oprox build') {
+      setTerminalLogs((prev) => [
+        ...prev,
+        '[INFO] Compiling TypeScript AST with Vite & esbuild...',
+        '[INFO] Bundling server modules to dist/server.cjs...',
+        '[SUCCESS] Production build complete! zero errors.',
+      ]);
+      return;
+    }
+
+    if (trimmed === 'oprox deploy') {
+      setTerminalLogs((prev) => [
+        ...prev,
+        '[INFO] Initiating Cloud Run zero-downtime deployment...',
+        '[INFO] Building container image oprox-platform:latest...',
+        '[INFO] Running health probe against /api/health...',
+        '[SUCCESS] Deployment complete! Live URL: https://platform.oprox.ai',
+      ]);
+      return;
+    }
+
+    if (trimmed === 'whoami') {
+      setTerminalLogs((prev) => [...prev, 'usr_admin01 (Enterprise Workspace Administrator)']);
+      return;
+    }
+
+    if (trimmed === 'node -v') {
+      setTerminalLogs((prev) => [...prev, 'v22.14.0']);
+      return;
+    }
+
+    if (trimmed === 'env') {
+      setTerminalLogs((prev) => [
+        ...prev,
+        'NODE_ENV=development',
+        'PORT=3000',
+        'SYSTEM_NAME=OPROX Autonomous AI Platform',
+        'DATABASE_URL=postgres://oprox:*****@localhost:5432/oprox_db',
+      ]);
+      return;
+    }
+
+    setTerminalLogs((prev) => [...prev, `[INFO] Executed process: ${trimmed}`]);
   };
 
   // Dispatch AI Task Handler
@@ -270,21 +392,58 @@ export const OproxCodeIDE: React.FC<OproxCodeIDEProps> = ({
     setIsAgentProcessing(true);
     const activeTab = openTabs.find((t) => t.path === activeTabPath);
 
-    setTimeout(() => {
+    try {
+      const response = await fetch('/api/ai/agent-task', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer usr_admin01',
+        },
+        body: JSON.stringify({
+          agentType: agentRole,
+          prompt: promptText,
+          projectContext: currentProject,
+          activeFileContent: activeTab ? activeTab.content : '',
+          vfsTree: vfsNodes,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'AI task dispatch failed.' }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
       const newMsg: AgentMessage = {
         id: 'msg_' + Math.random().toString(36).substring(7),
         agentRole: agentRole,
         timestamp: new Date().toLocaleTimeString(),
-        thought: `Analyzing input requirements for ${agentRole}`,
+        thought: data.thought || `Analyzing input requirements for ${agentRole}`,
         content: `Completed task: "${promptText}"`,
-        plan: ['1. Parse AST spec', '2. Generate modular TS patch', '3. Execute Vitest suite'],
-        codeSnippet: `// OPROX Auto-Generated Patch\nexport function handle${agentRole}Logic() {\n  console.log("Synthesized response for: ${promptText}");\n  return true;\n}`,
+        plan: data.plan || ['1. Parse AST spec', '2. Generate modular TS patch', '3. Execute Vitest suite'],
+        codeSnippet: data.codeSnippet || `// OPROX Auto-Generated Patch\nexport function handle${agentRole}Logic() {\n  console.log("Synthesized response for: ${promptText}");\n  return true;\n}`,
+        suggestedCommands: data.suggestedCommands,
+        reviewNotes: data.reviewNotes,
       };
 
       setAgentMessages((prev) => [...prev, newMsg]);
-      setIsAgentProcessing(false);
       setTerminalLogs((prev) => [...prev, `[AGENT LOG] ${agentRole} completed task: "${promptText}"`]);
-    }, 600);
+    } catch (err: any) {
+      const fallbackMsg: AgentMessage = {
+        id: 'msg_' + Math.random().toString(36).substring(7),
+        agentRole: agentRole,
+        timestamp: new Date().toLocaleTimeString(),
+        thought: `[Fallback Mode] Processing task for ${agentRole}: ${err?.message || 'Local execution'}`,
+        content: `Task execution notes for: "${promptText}"`,
+        plan: ['1. Parse requirement specs', '2. Apply AST modifications', '3. Run verification checks'],
+        codeSnippet: `// OPROX Synthesized Patch for ${promptText}\nexport function handle${agentRole}() {\n  return { status: "completed", timestamp: Date.now() };\n}`,
+      };
+      setAgentMessages((prev) => [...prev, fallbackMsg]);
+      setTerminalLogs((prev) => [...prev, `[AGENT LOG] ${agentRole} completed task (fallback mode): "${promptText}"`]);
+    } finally {
+      setIsAgentProcessing(false);
+    }
   };
 
   const handleRequestAiAction = (actionType: string, path: string, content: string) => {

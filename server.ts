@@ -35,6 +35,13 @@ import {
   setAutoRenewSetting,
 } from './src/lib/paymentMethods';
 import { addMemberToOrganization } from './src/lib/userOrg';
+import {
+  getAllWorkspaceProjects,
+  getWorkspaceProjectById,
+  createWorkspaceProject,
+  updateWorkspaceProject,
+  deleteWorkspaceProject,
+} from './src/lib/workspaceProjects';
 
 dotenv.config();
 
@@ -330,6 +337,59 @@ app.post('/api/organizations/:id/members', requireAuth, async (req: AuthRequest,
     res.json({ success: true, member });
   } catch (err: any) {
     res.status(403).json({ error: err?.message || 'Failed to add member to organization.' });
+  }
+});
+
+// Workspace Projects REST API Routes
+app.get('/api/projects', async (req, res) => {
+  try {
+    const projects = await getAllWorkspaceProjects();
+    res.json({ success: true, projects });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch workspace projects.' });
+  }
+});
+
+app.get('/api/projects/:id', async (req, res) => {
+  try {
+    const project = await getWorkspaceProjectById(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found.' });
+    res.json({ success: true, project });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch project.' });
+  }
+});
+
+app.post('/api/projects', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { title, description, category, icon, vfsNodes } = req.body;
+    if (!title || typeof title !== 'string') {
+      return res.status(400).json({ error: 'Title string is required.' });
+    }
+    const project = await createWorkspaceProject({ title, description, category, icon, vfsNodes });
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'CREATE_WORKSPACE_PROJECT', projectId: project.id, title });
+    res.json({ success: true, project });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Failed to create workspace project.' });
+  }
+});
+
+app.put('/api/projects/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const updated = await updateWorkspaceProject(req.params.id, req.body);
+    res.json({ success: true, project: updated });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Failed to update workspace project.' });
+  }
+});
+
+app.delete('/api/projects/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const result = await deleteWorkspaceProject(req.params.id);
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'DELETE_WORKSPACE_PROJECT', projectId: req.params.id });
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Failed to delete workspace project.' });
   }
 });
 

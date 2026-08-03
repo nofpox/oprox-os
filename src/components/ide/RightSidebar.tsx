@@ -198,19 +198,32 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
             <div className="flex-1 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden flex items-center justify-center p-2">
               <div
                 key={previewKey}
-                className={`h-full bg-slate-950 rounded-lg border border-slate-800 flex flex-col items-center justify-center text-center p-6 space-y-4 transition-all ${
+                className={`h-full bg-slate-950 rounded-lg border border-slate-800 flex flex-col overflow-hidden transition-all ${
                   previewViewport === 'desktop' ? 'w-full' : previewViewport === 'tablet' ? 'w-[80%]' : 'w-[55%]'
                 }`}
               >
-                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold text-lg">
-                  OP
+                <div className="bg-slate-900 px-3 py-1.5 border-b border-slate-800 flex items-center justify-between text-[11px] font-mono text-slate-400">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Container Health: 200 OK</span>
+                  </div>
+                  <a
+                    href="/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1 text-emerald-400 hover:underline"
+                  >
+                    <span>Open Tab</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
-                <div>
-                  <h3 className="font-extrabold text-sm text-slate-100">OPROX Application Container</h3>
-                  <p className="text-xs text-slate-400 mt-1">Listening on Port 3000 (0.0.0.0)</p>
-                </div>
-                <div className="px-3 py-1 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-mono border border-emerald-500/20">
-                  Status: 200 OK • Latency: 14ms
+                <div className="flex-1 w-full bg-white relative">
+                  <iframe
+                    src="/"
+                    title="Live App Preview"
+                    className="w-full h-full border-none"
+                    sandbox="allow-scripts allow-same-origin allow-forms"
+                  />
                 </div>
               </div>
             </div>

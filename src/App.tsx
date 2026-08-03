@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Header } from './components/Header';
 import { ShowcaseView } from './components/showcase/ShowcaseView';
 import { OproxCodeIDE } from './components/ide/OproxCodeIDE';
@@ -15,6 +15,13 @@ import { DashboardView } from './components/dashboard/DashboardView';
 import { useUIState } from './integration/UIStateContext';
 import { NotificationToastContainer } from './integration/NotificationToast';
 
+// Shared Modals & Error Boundary
+import { CommandPaletteModal } from './components/common/CommandPaletteModal';
+import { NotificationCenterModal } from './components/common/NotificationCenterModal';
+import { ProjectManagementModal } from './components/common/ProjectManagementModal';
+import { UserSettingsModal } from './components/common/UserSettingsModal';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
+
 export default function App() {
   const {
     currentMode,
@@ -25,8 +32,16 @@ export default function App() {
     activePrompt,
     launchIdeWithPrompt,
     theme,
-    toggleTheme
+    toggleTheme,
+    notifications,
+    dismissNotification
   } = useUIState();
+
+  // Modals state
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
+  const [isProjectManagerOpen, setIsProjectManagerOpen] = useState(false);
+  const [isUserSettingsOpen, setIsUserSettingsOpen] = useState(false);
 
   const handleLaunchIdeWithPrompt = (prompt: string, projectTitle: string) => {
     launchIdeWithPrompt(prompt, projectTitle);
@@ -45,62 +60,105 @@ export default function App() {
         activeProjectTitle={activeProjectTitle}
         theme={theme}
         onToggleTheme={toggleTheme}
+        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+        onOpenNotifications={() => setIsNotificationCenterOpen(true)}
+        onOpenProjectManager={() => setIsProjectManagerOpen(true)}
+        onOpenUserSettings={() => setIsUserSettingsOpen(true)}
+        unreadNotificationsCount={notifications.length}
       />
 
       <main className="max-w-[1700px] mx-auto px-4 pt-4">
-        {currentMode === 'dashboard' && (
-          <DashboardView
-            onNavigateMode={setCurrentMode}
-            onLaunchIdeWithPrompt={handleLaunchIdeWithPrompt}
-            theme={theme}
-          />
-        )}
+        <ErrorBoundary>
+          {currentMode === 'dashboard' && (
+            <DashboardView
+              onNavigateMode={setCurrentMode}
+              onLaunchIdeWithPrompt={handleLaunchIdeWithPrompt}
+              theme={theme}
+            />
+          )}
 
-        {currentMode === 'ai-os' && (
-          <AiOperatingSystem
-            initialPrompt={activePrompt}
-            onLaunchIdeWithPrompt={handleLaunchIdeWithPrompt}
-            theme={theme}
-          />
-        )}
+          {currentMode === 'ai-os' && (
+            <AiOperatingSystem
+              initialPrompt={activePrompt}
+              onLaunchIdeWithPrompt={handleLaunchIdeWithPrompt}
+              theme={theme}
+            />
+          )}
 
-        {currentMode === 'solutions' && (
-          <SolutionsPlatform theme={theme} />
-        )}
+          {currentMode === 'solutions' && (
+            <SolutionsPlatform theme={theme} />
+          )}
 
-        {currentMode === 'platform-suite' && (
-          <PlatformHub theme={theme} />
-        )}
+          {currentMode === 'platform-suite' && (
+            <PlatformHub theme={theme} />
+          )}
 
-        {currentMode === 'design-system' && (
-          <DesignSystemView theme={theme} onToggleTheme={toggleTheme} />
-        )}
+          {currentMode === 'design-system' && (
+            <DesignSystemView theme={theme} onToggleTheme={toggleTheme} />
+          )}
 
-        {currentMode === 'ide' && (
-          <OproxCodeIDE
-            initialPrompt={activePrompt}
-            onProjectChange={setActiveProjectTitle}
-          />
-        )}
+          {currentMode === 'ide' && (
+            <OproxCodeIDE
+              initialPrompt={activePrompt}
+              onProjectChange={setActiveProjectTitle}
+            />
+          )}
 
-        {currentMode === 'showcase' && (
-          <ShowcaseView
-            onLaunchIdeWithPrompt={handleLaunchIdeWithPrompt}
-            onNavigateMode={setCurrentMode}
-            theme={theme}
-          />
-        )}
+          {currentMode === 'showcase' && (
+            <ShowcaseView
+              onLaunchIdeWithPrompt={handleLaunchIdeWithPrompt}
+              onNavigateMode={setCurrentMode}
+              theme={theme}
+            />
+          )}
 
-        {currentMode === 'database' && <DatabaseStudio />}
+          {currentMode === 'database' && <DatabaseStudio />}
 
-        {currentMode === 'cloud' && <CloudMonitors />}
+          {currentMode === 'cloud' && <CloudMonitors />}
 
-        {currentMode === 'enterprise' && <EnterpriseOS />}
+          {currentMode === 'enterprise' && <EnterpriseOS />}
 
-        {currentMode === 'media' && <MediaStudio />}
+          {currentMode === 'media' && <MediaStudio />}
 
-        {currentMode === 'proptech' && <PropTechStudio />}
+          {currentMode === 'proptech' && <PropTechStudio />}
+        </ErrorBoundary>
       </main>
+
+      {/* Global Modals */}
+      <CommandPaletteModal
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onNavigateMode={setCurrentMode}
+        onToggleTheme={toggleTheme}
+        onOpenNewProject={() => {
+          setIsCommandPaletteOpen(false);
+          setIsProjectManagerOpen(true);
+        }}
+        theme={theme}
+      />
+
+      <NotificationCenterModal
+        isOpen={isNotificationCenterOpen}
+        onClose={() => setIsNotificationCenterOpen(false)}
+        notifications={notifications}
+        onDismiss={dismissNotification}
+        theme={theme}
+      />
+
+      <ProjectManagementModal
+        isOpen={isProjectManagerOpen}
+        onClose={() => setIsProjectManagerOpen(false)}
+        activeProjectTitle={activeProjectTitle}
+        onSelectProject={setActiveProjectTitle}
+        theme={theme}
+      />
+
+      <UserSettingsModal
+        isOpen={isUserSettingsOpen}
+        onClose={() => setIsUserSettingsOpen(false)}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+      />
 
       {/* Global Notification Toast Renderer */}
       <NotificationToastContainer />

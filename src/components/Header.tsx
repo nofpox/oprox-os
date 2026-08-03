@@ -8,15 +8,17 @@ import {
   Film, 
   Building2, 
   Sparkles, 
-  Activity,
   Zap,
-  CheckCircle2,
   Palette,
   Sun,
   Moon,
   LayoutDashboard,
   ShoppingBag,
-  Sliders
+  Sliders,
+  Search,
+  Bell,
+  Settings,
+  FolderKanban
 } from 'lucide-react';
 import { AppMode } from '../types';
 
@@ -27,6 +29,11 @@ interface HeaderProps {
   activeProjectTitle: string;
   theme?: 'dark' | 'light';
   onToggleTheme?: () => void;
+  onOpenCommandPalette?: () => void;
+  onOpenNotifications?: () => void;
+  onOpenProjectManager?: () => void;
+  onOpenUserSettings?: () => void;
+  unreadNotificationsCount?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -36,6 +43,11 @@ export const Header: React.FC<HeaderProps> = ({
   activeProjectTitle,
   theme = 'dark',
   onToggleTheme,
+  onOpenCommandPalette,
+  onOpenNotifications,
+  onOpenProjectManager,
+  onOpenUserSettings,
+  unreadNotificationsCount = 3,
 }) => {
   const isDark = theme === 'dark';
 
@@ -55,10 +67,10 @@ export const Header: React.FC<HeaderProps> = ({
   ];
 
   return (
-    <header className={`sticky top-0 z-50 backdrop-blur-md transition-colors duration-200 border-b ${
+    <header className={`sticky top-0 z-40 backdrop-blur-md transition-colors duration-200 border-b ${
       isDark ? 'bg-slate-950/90 border-slate-800/80 text-slate-100' : 'bg-white/90 border-slate-200 text-slate-900 shadow-sm'
     }`}>
-      <div className="max-w-[1700px] mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-4">
+      <div className="max-w-[1700px] mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
         {/* Brand Logo & Tag */}
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 via-teal-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
@@ -75,7 +87,7 @@ export const Header: React.FC<HeaderProps> = ({
                 v4.2 OS
               </span>
             </div>
-            <p className={`text-[11px] font-medium truncate max-w-[200px] sm:max-w-none ${
+            <p className={`text-[11px] font-medium truncate max-w-[180px] sm:max-w-none ${
               isDark ? 'text-slate-400' : 'text-slate-500'
             }`}>
               Autonomous AI Software Platform
@@ -115,8 +127,73 @@ export const Header: React.FC<HeaderProps> = ({
           })}
         </nav>
 
-        {/* System Health & Theme Toggle Indicators */}
-        <div className="flex items-center gap-3">
+        {/* Header Action Tools */}
+        <div className="flex items-center gap-2">
+          {/* Command Palette Trigger */}
+          {onOpenCommandPalette && (
+            <button
+              onClick={onOpenCommandPalette}
+              title="Command Palette (Ctrl+K)"
+              className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
+                isDark ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+              }`}
+            >
+              <Search className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-slate-400">Search...</span>
+              <kbd className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                ⌘K
+              </kbd>
+            </button>
+          )}
+
+          {/* Project Manager Button */}
+          {onOpenProjectManager && (
+            <button
+              onClick={onOpenProjectManager}
+              title="Switch / Create Projects"
+              className={`hidden md:flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
+                isDark ? 'bg-slate-900 hover:bg-slate-800 border-slate-800' : 'bg-slate-100 hover:bg-slate-200 border-slate-200'
+              }`}
+            >
+              <FolderKanban className="w-3.5 h-3.5 text-amber-400" />
+              <span className={`font-semibold truncate max-w-[110px] ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                {activeProjectTitle}
+              </span>
+            </button>
+          )}
+
+          {/* Notification Bell */}
+          {onOpenNotifications && (
+            <button
+              onClick={onOpenNotifications}
+              title="Global Notifications"
+              className={`relative p-2 rounded-xl border transition-all cursor-pointer ${
+                isDark ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+              }`}
+            >
+              <Bell className="w-4 h-4 text-cyan-400" />
+              {unreadNotificationsCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 text-slate-950 font-bold text-[9px] flex items-center justify-center">
+                  {unreadNotificationsCount}
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* User Settings */}
+          {onOpenUserSettings && (
+            <button
+              onClick={onOpenUserSettings}
+              title="Platform Settings & Governance"
+              className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                isDark ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+              }`}
+            >
+              <Settings className="w-4 h-4 text-indigo-400" />
+            </button>
+          )}
+
+          {/* Theme Toggle */}
           {onToggleTheme && (
             <button
               onClick={onToggleTheme}
@@ -129,16 +206,8 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          <div className={`hidden lg:flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg border ${
-            isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'
-          }`}>
-            <span className="text-slate-400">Project:</span>
-            <span className={`font-semibold truncate max-w-[120px] ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
-              {activeProjectTitle}
-            </span>
-          </div>
-
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border ${
+          {/* Live Status Badge */}
+          <div className={`hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs border ${
             isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'
           }`}>
             <span className="relative flex h-2 w-2">
@@ -152,14 +221,13 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button 
             onClick={() => onSelectMode('ide')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 hover:brightness-110 transition-all shadow-md shadow-emerald-500/10 cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 hover:brightness-110 transition-all shadow-md shadow-emerald-500/10 cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Launch OPROX Code</span>
+            <span className="hidden sm:inline">Launch OPROX Code</span>
           </button>
         </div>
       </div>
     </header>
   );
 };
-

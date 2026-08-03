@@ -87,9 +87,17 @@ export async function createCoupon(couponData: { code: string; discountType: str
   return coupon;
 }
 
+import {
+  addSavedPaymentMethod,
+  setAutoRenewSetting,
+  getAutoRenewSetting,
+  getWalletBalance as getWalletBalanceLib,
+} from './paymentMethods';
+
 /**
  * Phase 4: Atomic billing workflow for creating or upgrading subscriptions.
  * Enforces pricing catalog active status & approved prices, payment method policy, ZATCA e-invoicing, and wallet credits.
+ * Enforces Prepaid Policy, Optional Saved Payment Method (default false), and Auto Renew (default false).
  */
 export async function createSubscriptionAtomic(data: {
   userId: string;
@@ -100,9 +108,13 @@ export async function createSubscriptionAtomic(data: {
   paymentMethod?: string;
   stripeCustomerId?: string;
   walletCreditMicros?: number;
+  savePaymentMethod?: boolean;
+  autoRenew?: boolean;
 }) {
   const currency = data.currency || 'SAR';
-  const paymentMethod = data.paymentMethod || 'mada';
+  const paymentMethod = data.paymentMethod || 'unified';
+  const savePaymentMethod = data.savePaymentMethod ?? false;
+  const autoRenew = data.autoRenew ?? false;
 
   // 1. Validate Payment Method against OPROX Policy
   const payVal = await validatePaymentMethodAllowed(paymentMethod);
@@ -123,6 +135,19 @@ export async function createSubscriptionAtomic(data: {
 
   const subId = `sub_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
+  // Set autoRenew preference (default false)
+  await setAutoRenewSetting(data.userId, autoRenew);
+
+  // Optionally save payment method if explicitly requested (default false)
+  if (savePaymentMethod) {
+    await addSavedPaymentMethod(data.userId, {
+      type: paymentMethod,
+      brand: 'Visa / mada',
+      last4: '4242',
+      isDefault: true,
+    });
+  }
+
   const subscriptionRow = {
     id: subId,
     userId: data.userId,
@@ -135,7 +160,7 @@ export async function createSubscriptionAtomic(data: {
     interval: plan.billingInterval || 'month',
     currentPeriodStart: new Date(),
     currentPeriodEnd: new Date(Date.now() + 30 * 86400 * 1000),
-    cancelAtPeriodEnd: false,
+    cancelAtPeriodEnd: !autoRenew, // Default: auto-renew is OFF
     seatsCount: 1,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -187,10 +212,53 @@ export async function createSubscriptionAtomic(data: {
     action: 'SUBSCRIPTION_CREATED',
     targetType: 'SUBSCRIPTION',
     targetId: subId,
-    metadata: { planId: data.planId, currency, paymentMethod, invoiceId: invoiceRow.id },
+    metadata: {
+      planId: data.planId,
+      currency,
+      paymentMethod,
+      invoiceId: invoiceRow.id,
+      savePaymentMethod,
+      autoRenew,
+    },
   });
 
-  return { subscription: subscriptionRow, invoice: invoiceRow };
+  return { subscription: subscriptionRow, invoice: invoiceRow, savePaymentMethod, autoRenew };
+}
+
+/**
+ * Asserts that the platform is permitted to charge a customer.
+ * Charges are ONLY permitted if:
+ * A) The customer is actively making a payment (isActivePaymentSession = true)
+ * OR
+ * B) The customer explicitly enabled Auto Renew.
+ */
+export async function assertCanChargeCustomer(userId: string, isActivePaymentSession: boolean): Promise<boolean> {
+  if (isActivePaymentSession) {
+    return true;
+  }
+  const autoRenew = await getAutoRenewSetting(userId);
+  if (!autoRenew) {
+    throw new Error('NO_SURPRISE_CHARGES: Automatic charging is prohibited because Auto-Renew is disabled and no active payment session exists.');
+  }
+  return true;
+}
+
+/**
+ * Asserts compliance with OPROX Prepaid Only policy.
+ * When subscription or credits reach zero, billable services are immediately suspended.
+ */
+export async function assertPrepaidPolicy(userId: string): Promise<{ active: boolean; message?: string }> {
+  const userSubs = Array.from(memoryDb.subscriptions.values()).filter((s) => s.userId === userId && s.status === 'active');
+  const userWallet = memoryDb.aiWalletBalances.get(userId);
+  const totalBalance = (userWallet?.walletMicros || 0) + (userWallet?.includedCreditMicros || 0);
+
+  if (userSubs.length === 0 && totalBalance <= 0) {
+    return {
+      active: false,
+      message: 'Your subscription or credits have expired. Please renew to continue.',
+    };
+  }
+  return { active: true };
 }
 
 /**

@@ -22,7 +22,18 @@ import {
   cancelSubscriptionAtPeriodEnd,
   assertNoRefundsPolicy,
   getInvoices,
+  assertCanChargeCustomer,
+  assertPrepaidPolicy,
 } from './src/lib/billing';
+import {
+  getSavedPaymentMethods,
+  addSavedPaymentMethod,
+  removeSavedPaymentMethod,
+  replaceSavedPaymentMethod,
+  setDefaultPaymentMethod,
+  getAutoRenewSetting,
+  setAutoRenewSetting,
+} from './src/lib/paymentMethods';
 import { addMemberToOrganization } from './src/lib/userOrg';
 
 dotenv.config();
@@ -199,6 +210,115 @@ app.post('/api/billing/refunds', requireAuth, (req: AuthRequest, res) => {
 app.get('/api/billing/invoices', requireAuth, async (req: AuthRequest, res) => {
   const invoices = await getInvoices();
   res.json({ invoices });
+});
+
+// Unified Checkout Endpoint ("Pay Now")
+app.post('/api/billing/checkout', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    await assertCanChargeCustomer(userId, true);
+
+    const { planId, savePaymentMethod, autoRenew, paymentMethod } = req.body;
+    const result = await createSubscriptionAtomic({
+      userId,
+      orgId: req.user?.orgId,
+      planId: planId || 'pro',
+      currency: 'SAR',
+      paymentMethod: paymentMethod || 'unified',
+      savePaymentMethod: savePaymentMethod ?? false, // Default: DO NOT SAVE
+      autoRenew: autoRenew ?? false,                 // Default: AUTO RENEW = OFF
+    });
+
+    res.json({
+      success: true,
+      message: 'Payment completed successfully via Unified Checkout.',
+      ...result,
+    });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Unified checkout failed.' });
+  }
+});
+
+// User Saved Payment Methods Management Routes (Optional Storage Policy)
+app.get('/api/billing/payment-methods', requireAuth, async (req: AuthRequest, res) => {
+  const userId = req.user!.id;
+  const methods = await getSavedPaymentMethods(userId);
+  res.json({
+    savedPaymentMethods: methods,
+    supportedInstruments: {
+      saudi: ['mada', 'STC Pay', 'Barq', 'Bank Transfer', 'Visa', 'Mastercard'],
+      international: ['Visa', 'Mastercard', 'International Bank Transfer'],
+    },
+  });
+});
+
+app.post('/api/billing/payment-methods', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const method = await addSavedPaymentMethod(userId, req.body);
+    res.json({ success: true, paymentMethod: method });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Failed to save payment method.' });
+  }
+});
+
+app.delete('/api/billing/payment-methods/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const result = await removeSavedPaymentMethod(userId, req.params.id);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Failed to remove payment method.' });
+  }
+});
+
+app.post('/api/billing/payment-methods/:id/replace', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const method = await replaceSavedPaymentMethod(userId, req.params.id, req.body);
+    res.json({ success: true, paymentMethod: method });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Failed to replace payment method.' });
+  }
+});
+
+app.post('/api/billing/payment-methods/:id/default', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const method = await setDefaultPaymentMethod(userId, req.params.id);
+    res.json({ success: true, paymentMethod: method });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Failed to set default payment method.' });
+  }
+});
+
+// Auto-Renew Preference Route (Default OFF Policy)
+app.get('/api/billing/auto-renew', requireAuth, async (req: AuthRequest, res) => {
+  const userId = req.user!.id;
+  const autoRenew = await getAutoRenewSetting(userId);
+  res.json({ autoRenew });
+});
+
+app.post('/api/billing/auto-renew', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const enabled = Boolean(req.body.autoRenew);
+    const updated = await setAutoRenewSetting(userId, enabled);
+    res.json({ success: true, autoRenew: updated });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Failed to update auto-renew preference.' });
+  }
+});
+
+// Prepaid Status Route
+app.get('/api/billing/prepaid-status', requireAuth, async (req: AuthRequest, res) => {
+  const userId = req.user!.id;
+  const prepaidCheck = await assertPrepaidPolicy(userId);
+  res.json({
+    prepaidOnly: true,
+    active: prepaidCheck.active,
+    expiredMessage: prepaidCheck.message || null,
+  });
 });
 
 app.post('/api/organizations/:id/members', requireAuth, async (req: AuthRequest, res) => {

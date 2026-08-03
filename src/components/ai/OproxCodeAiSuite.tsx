@@ -46,6 +46,9 @@ import { EndToEndLifecycleEngine } from './EndToEndLifecycleEngine';
 // Phase 4 Components
 import { ProductionDeliveryEngine } from './ProductionDeliveryEngine';
 
+// Phase 5 Components
+import { EnterpriseCollaborationEngine } from './EnterpriseCollaborationEngine';
+
 interface OproxCodeAiSuiteProps {
   theme?: 'dark' | 'light';
   activeProjectTitle?: string;
@@ -61,8 +64,8 @@ export const OproxCodeAiSuite: React.FC<OproxCodeAiSuiteProps> = ({
 }) => {
   const isDark = theme === 'dark';
 
-  const [activePhase, setActivePhase] = useState<'phase1' | 'phase2' | 'phase3' | 'phase4'>('phase4');
-  const [activeModule, setActiveModule] = useState<string>('delivery');
+  const [activePhase, setActivePhase] = useState<'phase1' | 'phase2' | 'phase3' | 'phase4' | 'phase5'>('phase5');
+  const [activeModule, setActiveModule] = useState<string>('enterprise');
 
   const phase1Modules = [
     {
@@ -202,8 +205,20 @@ export const OproxCodeAiSuite: React.FC<OproxCodeAiSuiteProps> = ({
     },
   ];
 
+  const phase5Modules = [
+    {
+      id: 'enterprise',
+      name: 'Enterprise Governance',
+      icon: <Users className="w-4 h-4" />,
+      badge: 'Phase 5 Live',
+      desc: 'Enterprise collaboration, CR engine, human approvals, segregation of duties, and AI autonomy limits.'
+    },
+  ];
+
   const currentModules =
-    activePhase === 'phase4'
+    activePhase === 'phase5'
+      ? phase5Modules
+      : activePhase === 'phase4'
       ? phase4Modules
       : activePhase === 'phase3'
       ? phase3Modules
@@ -290,7 +305,20 @@ export const OproxCodeAiSuite: React.FC<OproxCodeAiSuiteProps> = ({
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                Phase 4: Autonomous Operations
+                Phase 4: Operations
+              </button>
+              <button
+                onClick={() => {
+                  setActivePhase('phase5');
+                  setActiveModule('enterprise');
+                }}
+                className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                  activePhase === 'phase5'
+                    ? 'bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-400/20'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Phase 5: Enterprise
               </button>
             </div>
 
@@ -486,6 +514,14 @@ export const OproxCodeAiSuite: React.FC<OproxCodeAiSuiteProps> = ({
         {/* Phase 4 Modules */}
         {activeModule === 'delivery' && (
           <ProductionDeliveryEngine
+            projectTitle={activeProjectTitle}
+            theme={theme}
+          />
+        )}
+
+        {/* Phase 5 Modules */}
+        {activeModule === 'enterprise' && (
+          <EnterpriseCollaborationEngine
             projectTitle={activeProjectTitle}
             theme={theme}
           />

@@ -817,4 +817,216 @@ export const phase4EnvConfigsTable = pgTable(
 
 export type Phase4EnvConfigRow = typeof phase4EnvConfigsTable.$inferSelect;
 
+// ── Phase 5: Enterprise Collaboration, Governed Autonomy & Software Delivery ─
+
+export const phase5TeamsTable = pgTable(
+  "phase5_teams",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    orgId: text("org_id").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    archived: boolean("archived").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [index("phase5_teams_tenant_idx").on(t.tenantId)]
+);
+
+export type Phase5TeamRow = typeof phase5TeamsTable.$inferSelect;
+
+export const phase5MembershipsTable = pgTable(
+  "phase5_memberships",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    orgId: text("org_id").notNull(),
+    userId: text("user_id").notNull(),
+    teamId: text("team_id"),
+    projectId: text("project_id"),
+    workspaceId: text("workspace_id"),
+    roles: jsonb("roles").notNull().default([]),
+    permissions: jsonb("permissions").notNull().default([]),
+    status: text("status").notNull().default("active"), // active | suspended
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("phase5_memberships_tenant_idx").on(t.tenantId),
+    index("phase5_memberships_user_idx").on(t.userId),
+  ]
+);
+
+export type Phase5MembershipRow = typeof phase5MembershipsTable.$inferSelect;
+
+export const phase5WorkspacesTable = pgTable(
+  "phase5_workspaces",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    orgId: text("org_id").notNull(),
+    projectId: text("project_id").notNull(),
+    name: text("name").notNull(),
+    ownerId: text("owner_id").notNull(),
+    environment: text("environment").notNull().default("development"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [index("phase5_workspaces_tenant_idx").on(t.tenantId)]
+);
+
+export type Phase5WorkspaceRow = typeof phase5WorkspacesTable.$inferSelect;
+
+export const phase5ChangeRequestsTable = pgTable(
+  "phase5_change_requests",
+  {
+    id: text("id").primaryKey(), // cr_xxx
+    tenantId: text("tenant_id").notNull(),
+    orgId: text("org_id").notNull(),
+    projectId: text("project_id").notNull(),
+    workspaceId: text("workspace_id").notNull(),
+    authorId: text("author_id").notNull(),
+    authorType: text("author_type").notNull().default("user"), // user | ai_agent
+    sourceBranch: text("source_branch").notNull().default("feature"),
+    targetBranch: text("target_branch").notNull().default("main"),
+    title: text("title").notNull(),
+    description: text("description"),
+    filesChanged: jsonb("files_changed").notNull().default([]),
+    diffMetadata: jsonb("diff_metadata").notNull().default({}),
+    riskClassification: text("risk_classification").notNull().default("LOW"), // LOW | MEDIUM | HIGH | CRITICAL
+    riskReasons: jsonb("risk_reasons").notNull().default([]),
+    status: text("status").notNull().default("OPEN"), // DRAFT | OPEN | IN_REVIEW | CHANGES_REQUESTED | APPROVED | REJECTED | MERGED | CANCELLED | BLOCKED
+    aiProposalMeta: jsonb("ai_proposal_meta").notNull().default({}),
+    contentHash: text("content_hash"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("phase5_cr_tenant_idx").on(t.tenantId),
+    index("phase5_cr_status_idx").on(t.status),
+  ]
+);
+
+export type Phase5ChangeRequestRow = typeof phase5ChangeRequestsTable.$inferSelect;
+
+export const phase5ApprovalsTable = pgTable(
+  "phase5_approvals",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    changeRequestId: text("change_request_id").notNull(),
+    approverId: text("approver_id").notNull(),
+    approverRole: text("approver_role"),
+    decision: text("decision").notNull(), // APPROVED | REJECTED
+    comment: text("comment"),
+    policyEvaluated: text("policy_evaluated"),
+    approvedContentHash: text("approved_content_hash").notNull(),
+    status: text("status").notNull().default("VALID"), // VALID | INVALIDATED
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("phase5_approvals_tenant_idx").on(t.tenantId),
+    index("phase5_approvals_cr_idx").on(t.changeRequestId),
+  ]
+);
+
+export type Phase5ApprovalRow = typeof phase5ApprovalsTable.$inferSelect;
+
+export const phase5ReviewsCommentsTable = pgTable(
+  "phase5_reviews_comments",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    changeRequestId: text("change_request_id").notNull(),
+    authorId: text("author_id").notNull(),
+    type: text("type").notNull().default("comment"), // comment | review_summary | line_comment
+    filePath: text("file_path"),
+    lineNumber: integer("line_number"),
+    content: text("content").notNull(),
+    resolved: boolean("resolved").notNull().default(false),
+    resolvedBy: text("resolved_by"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("phase5_comments_tenant_idx").on(t.tenantId),
+    index("phase5_comments_cr_idx").on(t.changeRequestId),
+  ]
+);
+
+export type Phase5ReviewCommentRow = typeof phase5ReviewsCommentsTable.$inferSelect;
+
+export const phase5CodeOwnersTable = pgTable(
+  "phase5_code_owners",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull(),
+    pathPattern: text("path_pattern").notNull(),
+    ownerType: text("owner_type").notNull(), // team | role | member
+    ownerTarget: text("owner_target").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [index("phase5_code_owners_tenant_idx").on(t.tenantId)]
+);
+
+export type Phase5CodeOwnerRow = typeof phase5CodeOwnersTable.$inferSelect;
+
+export const phase5PoliciesTable = pgTable(
+  "phase5_policies",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    orgId: text("org_id").notNull(),
+    projectId: text("project_id"),
+    policyType: text("policy_type").notNull(), // DEVELOPMENT_GOVERNANCE | PROTECTED_ENVIRONMENT | AUTONOMY
+    version: integer("version").notNull().default(1),
+    active: boolean("active").notNull().default(true),
+    config: jsonb("config").notNull().default({}),
+    authorId: text("author_id").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    activatedAt: timestamp("activated_at"),
+  },
+  (t) => [index("phase5_policies_tenant_idx").on(t.tenantId)]
+);
+
+export type Phase5PolicyRow = typeof phase5PoliciesTable.$inferSelect;
+
+export const phase5AutonomyConfigTable = pgTable("phase5_autonomy_config", {
+  tenantId: text("tenant_id").primaryKey(),
+  autonomyLevel: integer("autonomy_level").notNull().default(2), // 0 to 4
+  allowSelfEdit: boolean("allow_self_edit").notNull().default(false),
+  maxAiCostPerTaskUsd: numeric("max_ai_cost_per_task_usd", { precision: 12, scale: 2 }).notNull().default("5.00"),
+  requireApprovalForHighRisk: boolean("require_approval_for_high_risk").notNull().default(true),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type Phase5AutonomyConfigRow = typeof phase5AutonomyConfigTable.$inferSelect;
+
+export const phase5EventsTable = pgTable(
+  "phase5_events",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    orgId: text("org_id").notNull(),
+    projectId: text("project_id"),
+    actorId: text("actor_id").notNull(),
+    actorType: text("actor_type").notNull().default("user"), // user | ai_agent | system
+    action: text("action").notNull(),
+    resource: text("resource").notNull(),
+    resourceId: text("resource_id"),
+    risk: text("risk").notNull().default("LOW"),
+    details: jsonb("details").notNull().default({}),
+    timestamp: timestamp("timestamp").notNull().defaultNow(),
+  },
+  (t) => [
+    index("phase5_events_tenant_idx").on(t.tenantId),
+    index("phase5_events_action_idx").on(t.action),
+  ]
+);
+
+export type Phase5EventRow = typeof phase5EventsTable.$inferSelect;
+
 

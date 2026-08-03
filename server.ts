@@ -10,6 +10,7 @@ import adminRoutes from './server/adminRoutes';
 import stripeWebhookRouter from './server/stripeWebhook';
 import phase3Routes from './server/phase3Routes';
 import phase4Routes from './server/phase4Routes';
+import phase5Routes from './server/phase5Routes';
 import { aiGovernanceGate } from './server/aiGovernance';
 import { logSecurityAudit } from './server/audit';
 import { AuthRequest, requireAuth } from './server/auth';
@@ -157,6 +158,7 @@ app.get(['/api/readiness', '/readyz'], async (req, res) => {
 app.use(adminRoutes);
 app.use(phase3Routes);
 app.use(phase4Routes);
+app.use(phase5Routes);
 
 // Phase 4: Billing, Subscriptions & Invoicing API Routes
 app.post('/api/billing/subscriptions', requireAuth, async (req: AuthRequest, res) => {

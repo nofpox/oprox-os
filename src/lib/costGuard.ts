@@ -223,6 +223,12 @@ export function estimateCostUsd(model: string, estimatedTokens: number = 1000): 
   return Number((estimatedTokens * rate).toFixed(6));
 }
 
+export async function isCostGuardExceeded(tenantId?: string): Promise<boolean> {
+  const usage = await getCostGuardDailyUsage();
+  const settings = await getCostGuardSettings();
+  return settings.enabled && usage >= settings.maxDailyUsd;
+}
+
 export async function setCostGuardCurrentDaily(amountUsd: number): Promise<void> {
   const key = getTodayKey();
   const valStr = String(amountUsd);

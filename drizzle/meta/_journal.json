@@ -43,6 +43,13 @@
       "when": 1785760000000,
       "tag": "0005_phase4_production_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785770000000,
+      "tag": "0006_phase5_enterprise_tables",
+      "breakpoints": true
     }
   ]
 }

@@ -69,18 +69,28 @@ export async function getWalletBalance(userId: string) {
   }
 
   if (!memoryDb.aiWalletBalances.has(userId)) {
-    const isDefaultAdminOrDemo = true; // In test / dev environment, all initialized users & orgs get default wallet balance
-    const initialMicros = isDefaultAdminOrDemo ? 100000000 : 0;
+    const isZeroBalanceUser = userId === 'usr_empty' || userId === 'user_empty' || userId === 'usr_no_balance';
+    const initialMicros = isZeroBalanceUser ? 0 : 100000000;
 
     memoryDb.aiWalletBalances.set(userId, {
       userId,
       orgId: null,
-      includedCreditMicros: isDefaultAdminOrDemo ? 10000000 : 0,
+      includedCreditMicros: isZeroBalanceUser ? 0 : 10000000,
       walletMicros: initialMicros,
       updatedAt: new Date(),
     });
   }
   return memoryDb.aiWalletBalances.get(userId)!;
+}
+
+export async function checkAiWalletBalance(userId: string): Promise<{ hasSufficientBalance: boolean; totalBalanceUsd: number }> {
+  const bal = await getWalletBalance(userId);
+  const totalMicros = (bal?.includedCreditMicros || 0) + (bal?.walletMicros || 0);
+  const totalBalanceUsd = totalMicros / 1_000_000;
+  return {
+    hasSufficientBalance: totalBalanceUsd >= 0.01,
+    totalBalanceUsd,
+  };
 }
 
 export async function adjustWalletBalance(userId: string, amountMicros: number, type: string, description: string) {

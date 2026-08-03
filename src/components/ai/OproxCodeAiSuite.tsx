@@ -18,7 +18,8 @@ import {
   FolderPlus,
   Users,
   RefreshCw,
-  Rocket
+  Rocket,
+  GitMerge
 } from 'lucide-react';
 // Phase 1 Components
 import { AiSoftwareArchitect } from './AiSoftwareArchitect';
@@ -49,6 +50,9 @@ import { ProductionDeliveryEngine } from './ProductionDeliveryEngine';
 // Phase 5 Components
 import { EnterpriseCollaborationEngine } from './EnterpriseCollaborationEngine';
 
+// Phase 6 Components
+import { Phase6ProductionEngine } from './Phase6ProductionEngine';
+
 interface OproxCodeAiSuiteProps {
   theme?: 'dark' | 'light';
   activeProjectTitle?: string;
@@ -64,8 +68,8 @@ export const OproxCodeAiSuite: React.FC<OproxCodeAiSuiteProps> = ({
 }) => {
   const isDark = theme === 'dark';
 
-  const [activePhase, setActivePhase] = useState<'phase1' | 'phase2' | 'phase3' | 'phase4' | 'phase5'>('phase5');
-  const [activeModule, setActiveModule] = useState<string>('enterprise');
+  const [activePhase, setActivePhase] = useState<'phase1' | 'phase2' | 'phase3' | 'phase4' | 'phase5' | 'phase6'>('phase6');
+  const [activeModule, setActiveModule] = useState<string>('production_delivery');
 
   const phase1Modules = [
     {
@@ -215,8 +219,20 @@ export const OproxCodeAiSuite: React.FC<OproxCodeAiSuiteProps> = ({
     },
   ];
 
+  const phase6Modules = [
+    {
+      id: 'production_delivery',
+      name: 'Production Delivery Suite',
+      icon: <GitMerge className="w-4 h-4" />,
+      badge: 'Phase 6 Live',
+      desc: 'Repository provider adapters, Git branch management, CI/CD orchestration, preview environments & governed delivery.'
+    },
+  ];
+
   const currentModules =
-    activePhase === 'phase5'
+    activePhase === 'phase6'
+      ? phase6Modules
+      : activePhase === 'phase5'
       ? phase5Modules
       : activePhase === 'phase4'
       ? phase4Modules
@@ -319,6 +335,19 @@ export const OproxCodeAiSuite: React.FC<OproxCodeAiSuiteProps> = ({
                 }`}
               >
                 Phase 5: Enterprise
+              </button>
+              <button
+                onClick={() => {
+                  setActivePhase('phase6');
+                  setActiveModule('production_delivery');
+                }}
+                className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                  activePhase === 'phase6'
+                    ? 'bg-indigo-400 text-slate-950 shadow-lg shadow-indigo-400/20'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Phase 6: Production Delivery
               </button>
             </div>
 
@@ -525,6 +554,11 @@ export const OproxCodeAiSuite: React.FC<OproxCodeAiSuiteProps> = ({
             projectTitle={activeProjectTitle}
             theme={theme}
           />
+        )}
+
+        {/* Phase 6 Modules */}
+        {activeModule === 'production_delivery' && (
+          <Phase6ProductionEngine />
         )}
       </div>
     </div>

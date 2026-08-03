@@ -1029,4 +1029,236 @@ export const phase5EventsTable = pgTable(
 
 export type Phase5EventRow = typeof phase5EventsTable.$inferSelect;
 
+// ── Phase 6 Production Repository, CI/CD & Delivery Tables ──────────
 
+export const phase6RepositoryConnectionsTable = pgTable(
+  "phase6_repository_connections",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    orgId: text("org_id").notNull(),
+    projectId: text("project_id"),
+    provider: text("provider").notNull(), // github | gitlab | bitbucket | git
+    repoIdentifier: text("repo_identifier").notNull(), // owner/repo or path
+    repoOwner: text("repo_owner").notNull(),
+    defaultBranch: text("default_branch").notNull().default("main"),
+    connectionStatus: text("connection_status").notNull().default("CONFIGURED"), // CONFIGURED | NOT_CONFIGURED | UNSUPPORTED | FAILED
+    accountRef: text("account_ref"),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    lastVerifiedAt: timestamp("last_verified_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("p6_repo_conn_tenant_idx").on(t.tenantId),
+    index("p6_repo_conn_provider_idx").on(t.provider),
+  ]
+);
+
+export type Phase6RepositoryConnectionRow = typeof phase6RepositoryConnectionsTable.$inferSelect;
+
+export const phase6RepositoryBranchesTable = pgTable(
+  "phase6_repository_branches",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id"),
+    repoId: text("repo_id").notNull(),
+    name: text("name").notNull(),
+    type: text("type").notNull().default("feature"), // feature | ai_task | repair | release | hotfix
+    ownerId: text("owner_id").notNull(),
+    originatingTaskId: text("originating_task_id"),
+    changeRequestId: text("change_request_id"),
+    baseSha: text("base_sha").notNull(),
+    headSha: text("head_sha").notNull(),
+    status: text("status").notNull().default("active"), // active | merged | closed
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("p6_repo_branch_tenant_idx").on(t.tenantId),
+    index("p6_repo_branch_repo_idx").on(t.repoId),
+  ]
+);
+
+export type Phase6RepositoryBranchRow = typeof phase6RepositoryBranchesTable.$inferSelect;
+
+export const phase6CommitProvenanceTable = pgTable(
+  "phase6_commit_provenance",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    repoId: text("repo_id").notNull(),
+    commitSha: text("commit_sha").notNull(),
+    authorType: text("author_type").notNull().default("human"), // human | ai_generated | ai_assisted
+    authorId: text("author_id").notNull(),
+    requirementId: text("requirement_id"),
+    aiTaskId: text("ai_task_id"),
+    agentId: text("agent_id"),
+    workspaceId: text("workspace_id"),
+    branchName: text("branch_name").notNull(),
+    changeRequestId: text("change_request_id"),
+    riskLevel: text("risk_level").notNull().default("LOW"),
+    testStatus: text("test_status").notNull().default("NOT_RUN"),
+    securityReviewStatus: text("security_review_status").notNull().default("PASSED"),
+    approvalStatus: text("approval_status").notNull().default("APPROVED"),
+    aiCostUsd: numeric("ai_cost_usd", { precision: 12, scale: 4 }).notNull().default("0.0000"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("p6_commit_prov_tenant_idx").on(t.tenantId),
+    index("p6_commit_prov_sha_idx").on(t.commitSha),
+  ]
+);
+
+export type Phase6CommitProvenanceRow = typeof phase6CommitProvenanceTable.$inferSelect;
+
+export const phase6CiPipelineDefinitionsTable = pgTable(
+  "phase6_ci_pipeline_definitions",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id"),
+    name: text("name").notNull(),
+    stages: jsonb("stages").notNull().default([]),
+    allowlistedCommands: jsonb("allowlisted_commands").notNull().default([]),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("p6_ci_def_tenant_idx").on(t.tenantId),
+  ]
+);
+
+export type Phase6CiPipelineDefinitionRow = typeof phase6CiPipelineDefinitionsTable.$inferSelect;
+
+export const phase6CiPipelineRunsTable = pgTable(
+  "phase6_ci_pipeline_runs",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id"),
+    repoId: text("repo_id").notNull(),
+    pipelineId: text("pipeline_id").notNull(),
+    commitSha: text("commit_sha").notNull(),
+    branchName: text("branch_name").notNull(),
+    trigger: text("trigger").notNull().default("manual"), // manual | push | change_request | ai_repair
+    status: text("status").notNull().default("PENDING"), // PENDING | RUNNING | PASSED | FAILED | CANCELLED
+    stageResults: jsonb("stage_results").notNull().default([]),
+    durationMs: integer("duration_ms").notNull().default(0),
+    artifacts: jsonb("artifacts").notNull().default([]),
+    failureEvidence: jsonb("failure_evidence").notNull().default({}),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    finishedAt: timestamp("finished_at"),
+  },
+  (t) => [
+    index("p6_ci_run_tenant_idx").on(t.tenantId),
+    index("p6_ci_run_repo_idx").on(t.repoId),
+  ]
+);
+
+export type Phase6CiPipelineRunRow = typeof phase6CiPipelineRunsTable.$inferSelect;
+
+export const phase6BuildArtifactsTable = pgTable(
+  "phase6_build_artifacts",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id"),
+    repoId: text("repo_id").notNull(),
+    pipelineRunId: text("pipeline_run_id").notNull(),
+    commitSha: text("commit_sha").notNull(),
+    artifactType: text("artifact_type").notNull(), // frontend_bundle | server_bundle | container_image | test_report
+    name: text("name").notNull(),
+    checksumSha256: text("checksum_sha256").notNull(),
+    sizeBytes: integer("size_bytes").notNull().default(0),
+    storageRef: text("storage_ref").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("p6_artifact_tenant_idx").on(t.tenantId),
+    index("p6_artifact_sha_idx").on(t.commitSha),
+  ]
+);
+
+export type Phase6BuildArtifactRow = typeof phase6BuildArtifactsTable.$inferSelect;
+
+export const phase6DevEnvironmentsTable = pgTable(
+  "phase6_dev_environments",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id"),
+    name: text("name").notNull(),
+    branchName: text("branch_name").notNull(),
+    commitSha: text("commit_sha").notNull(),
+    provider: text("provider").notNull().default("local_runner"),
+    status: text("status").notNull().default("REQUESTED"), // REQUESTED | PROVISIONING | READY | BUSY | STOPPING | STOPPED | FAILED | EXPIRED
+    resourceRef: text("resource_ref"),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    expiresAt: timestamp("expires_at"),
+  },
+  (t) => [
+    index("p6_dev_env_tenant_idx").on(t.tenantId),
+  ]
+);
+
+export type Phase6DevEnvironmentRow = typeof phase6DevEnvironmentsTable.$inferSelect;
+
+export const phase6PreviewEnvironmentsTable = pgTable(
+  "phase6_preview_environments",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id"),
+    changeRequestId: text("change_request_id").notNull(),
+    commitSha: text("commit_sha").notNull(),
+    previewUrl: text("preview_url"),
+    status: text("status").notNull().default("REQUESTED"), // REQUESTED | PROVISIONING | READY | FAILED | EXPIRED
+    healthStatus: text("health_status").notNull().default("UNKNOWN"), // UNKNOWN | HEALTHY | UNHEALTHY
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    expiresAt: timestamp("expires_at"),
+  },
+  (t) => [
+    index("p6_preview_env_tenant_idx").on(t.tenantId),
+    index("p6_preview_env_cr_idx").on(t.changeRequestId),
+  ]
+);
+
+export type Phase6PreviewEnvironmentRow = typeof phase6PreviewEnvironmentsTable.$inferSelect;
+
+export const phase6ProviderEventsTable = pgTable(
+  "phase6_provider_events",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    provider: text("provider").notNull(),
+    eventType: text("event_type").notNull(),
+    repoIdentifier: text("repo_identifier").notNull(),
+    payload: jsonb("payload").notNull().default({}),
+    signatureVerified: boolean("signature_verified").notNull().default(false),
+    processed: boolean("processed").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("p6_prov_evt_tenant_idx").on(t.tenantId),
+  ]
+);
+
+export type Phase6ProviderEventRow = typeof phase6ProviderEventsTable.$inferSelect;
+
+export const phase6OperationLocksTable = pgTable(
+  "phase6_operation_locks",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull(),
+    lockKey: text("lock_key").notNull(),
+    lockedBy: text("locked_by").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("p6_lock_tenant_key_idx").on(t.tenantId, t.lockKey),
+  ]
+);
+
+export type Phase6OperationLockRow = typeof phase6OperationLocksTable.$inferSelect;

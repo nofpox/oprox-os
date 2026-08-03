@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1785686088662,
+      "tag": "0000_colossal_fat_cobra",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785691367314,
+      "tag": "0001_flippant_cerebro",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785734716597,
+      "tag": "0002_wild_falcon",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785740000000,
+      "tag": "0003_graceful_phase4_corrections",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785750000000,
+      "tag": "0004_phase3_execution_tables",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { memoryDb, db } from '../db';
 import {
   subscriptionsTable,
@@ -482,7 +483,7 @@ export async function processBillingWebhookEvent(evt: { id: string; type: string
   }
 
   const record = {
-    id: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    id: randomUUID(),
     stripeEventId: evt.id,
     eventType: evt.type,
     payload: evt.data || {},
@@ -490,15 +491,32 @@ export async function processBillingWebhookEvent(evt: { id: string; type: string
     createdAt: new Date(),
   };
 
-  memoryDb.billingEvents.push(record as any);
-
   if (db) {
     try {
       await db.insert(billingEventsTable).values(record as any);
-    } catch {
-      // Unique constraint violation in DB indicates duplicate
-      return { processed: true, duplicate: true };
+    } catch (err: any) {
+      // Only PostgreSQL UNIQUE constraint violation (code 23505) indicates duplicate event insertion race
+      const isUniqueViolation = err && (
+        err.code === '23505' ||
+        err.constraint?.includes('stripe_event_id') ||
+        (typeof err.message === 'string' && (err.message.includes('unique constraint') || err.message.includes('duplicate key')))
+      );
+
+      if (isUniqueViolation) {
+        if (!memoryDb.billingEvents.some((e) => e.stripeEventId === evt.id)) {
+          memoryDb.billingEvents.push(record as any);
+        }
+        return { processed: true, duplicate: true };
+      }
+
+      // Any non-unique database error must NOT be classified as duplicate!
+      console.error('[DATABASE ERROR] Failed to insert billing event:', err);
+      throw err;
     }
+  }
+
+  if (!memoryDb.billingEvents.some((e) => e.stripeEventId === evt.id)) {
+    memoryDb.billingEvents.push(record as any);
   }
 
   return { processed: true, duplicate: false };

@@ -53,17 +53,54 @@ describe('OPROX OS — Phase 4 Complete Corrections Test Suite', () => {
     expect(num2).toBe(num1 + 1);
   });
 
-  it('Correction 4: Guarantees billing webhook idempotency', async () => {
-    const eventId = `evt_test_idempotency_${Date.now()}`;
-    const payload = { id: eventId, type: 'invoice.payment_succeeded', data: { amount: 1000 } };
+  it('Correction 4: Guarantees billing webhook idempotency under sequential, concurrent, and DB error conditions', async () => {
+    // A. First delivery of a brand-new Stripe event
+    const eventIdA = `evt_test_new_${Date.now()}`;
+    const payloadA = { id: eventIdA, type: 'invoice.payment_succeeded', data: { amount: 1000 } };
 
-    const res1 = await processBillingWebhookEvent(payload);
-    expect(res1.processed).toBe(true);
-    expect(res1.duplicate).toBe(false);
+    const resA1 = await processBillingWebhookEvent(payloadA);
+    expect(resA1.processed).toBe(true);
+    expect(resA1.duplicate).toBe(false);
 
-    const res2 = await processBillingWebhookEvent(payload);
-    expect(res2.processed).toBe(true);
-    expect(res2.duplicate).toBe(true);
+    // B. Second delivery of the SAME stripeEventId
+    const resA2 = await processBillingWebhookEvent(payloadA);
+    expect(resA2.processed).toBe(true);
+    expect(resA2.duplicate).toBe(true);
+
+    // C. Concurrent deliveries of the same stripeEventId
+    const eventIdC = `evt_test_concurrent_${Date.now()}`;
+    const payloadC = { id: eventIdC, type: 'customer.subscription.created', data: { subId: 'sub_123' } };
+
+    const [resC1, resC2] = await Promise.all([
+      processBillingWebhookEvent(payloadC),
+      processBillingWebhookEvent(payloadC),
+    ]);
+
+    const duplicates = [resC1.duplicate, resC2.duplicate];
+    expect(duplicates).toContain(false);
+    expect(duplicates).toContain(true);
+
+    // D. Non-unique database error must NOT be classified as duplicate
+    // Mock db.insert throwing a non-unique error (e.g. connection error / syntax error)
+    const originalBillingEventsLength = memoryDb.billingEvents.length;
+    const fakeUnknownError = new Error('PostgreSQL connection timeout');
+    (fakeUnknownError as any).code = '08006'; // Connection failure, not 23505
+
+    // Verify processBillingWebhookEvent with mock error rethrows instead of returning duplicate: true
+    const eventIdD = `evt_test_dberr_${Date.now()}`;
+    const payloadD = { id: eventIdD, type: 'invoice.payment_failed' };
+
+    // If db exists, test db error path
+    const { db: actualDb } = await import('../src/db');
+    if (actualDb) {
+      const originalInsert = actualDb.insert;
+      actualDb.insert = (() => {
+        throw fakeUnknownError;
+      }) as any;
+
+      await expect(processBillingWebhookEvent(payloadD)).rejects.toThrow('PostgreSQL connection timeout');
+      actualDb.insert = originalInsert;
+    }
   });
 
   it('Correction 5: Removes $299 analytics pricing assumption', async () => {

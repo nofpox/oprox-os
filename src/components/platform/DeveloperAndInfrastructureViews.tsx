@@ -54,7 +54,7 @@ export const DeveloperAndInfrastructureViews: React.FC<DeveloperViewsProps> = ({
   };
 
   useEffect(() => {
-    if (viewId === 'api-status' || viewId === 'system-health') {
+    if (viewId === 'status-page' || viewId === 'deployments') {
       fetchHealthAndAlerts();
     }
   }, [viewId]);
@@ -76,7 +76,7 @@ export const DeveloperAndInfrastructureViews: React.FC<DeveloperViewsProps> = ({
     setApiKeys((prev) => [newKey, ...prev]);
   };
 
-  if (viewId === 'system-health' || viewId === 'api-status') {
+  if (viewId === 'status-page') {
     return (
       <div className="space-y-6 select-none font-mono text-xs">
         <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

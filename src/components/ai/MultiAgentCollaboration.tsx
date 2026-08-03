@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users,
   Compass,
@@ -11,13 +11,11 @@ import {
   ShieldCheck,
   FileText,
   ArrowRight,
-  RefreshCw,
   Workflow,
   Sparkles,
   GitPullRequest,
   Check,
-  Layers,
-  MessageSquare
+  AlertTriangle
 } from 'lucide-react';
 import { SpecialistAgentRole, AgentHandoffRecord } from '../../types';
 
@@ -34,6 +32,7 @@ export const MultiAgentCollaboration: React.FC<MultiAgentCollaborationProps> = (
 
   const [activeRole, setActiveRole] = useState<SpecialistAgentRole>('architect');
   const [isSwarmRunning, setIsSwarmRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // 9 Specialist Agents Metadata
   const agentsList: { id: SpecialistAgentRole; name: string; title: string; badge: string; icon: React.ReactNode; color: string }[] = [
@@ -54,66 +53,54 @@ export const MultiAgentCollaboration: React.FC<MultiAgentCollaborationProps> = (
     dbSchemaState: 'Tables: organizations, organization_members, api_keys, security_logs',
     activeEndpoints: 'POST /api/organizations, GET /api/organizations/:id, POST /api/ai/agent-task',
     frontendViews: 'OproxCodeAiSuite dashboard, MultiAgentCollaboration matrix, AutonomousCodeGenerator',
-    qaPassRate: '100% (14 Vitest Assertions Passed)',
+    qaPassRate: '100% (Vitest Assertions Passed)',
     securityAudit: 'Passed OWASP Top 10 (0 Vulnerabilities)',
-    containerState: 'Cloud Run Target - Port 3000 Ready'
+    containerState: 'Cloud Run Ingress - Port 3000 Active'
   });
 
   // Handoff Log History
-  const [handoffs, setHandoffs] = useState<AgentHandoffRecord[]>([
-    {
-      id: 'h_1',
-      fromAgent: 'architect',
-      toAgent: 'database',
-      taskTitle: 'Define Drizzle Schema for RBAC & Tenant Isolation',
-      outputSummary: 'Exported pgTable schema for organizations and members in src/lib/userOrg.ts',
-      timestamp: '10 mins ago',
-      status: 'passed'
-    },
-    {
-      id: 'h_2',
-      fromAgent: 'database',
-      toAgent: 'backend',
-      taskTitle: 'Synthesize REST API endpoints for Org Management',
-      outputSummary: 'Created orgRouter Express endpoints in src/routes/orgRoutes.ts',
-      timestamp: '8 mins ago',
-      status: 'passed'
-    },
-    {
-      id: 'h_3',
-      fromAgent: 'backend',
-      toAgent: 'frontend',
-      taskTitle: 'Integrate API Routes into React Workspace UI',
-      outputSummary: 'Created AutonomousCodeGenerator and MultiAgentCollaboration views',
-      timestamp: '5 mins ago',
-      status: 'passed'
-    },
-    {
-      id: 'h_4',
-      fromAgent: 'frontend',
-      toAgent: 'qa',
-      taskTitle: 'Generate Comprehensive Vitest Test Suite',
-      outputSummary: 'Generated phase2-oprox-code-ai.test.ts with 6 test suites',
-      timestamp: '2 mins ago',
-      status: 'passed'
-    }
-  ]);
+  const [handoffs, setHandoffs] = useState<AgentHandoffRecord[]>([]);
 
-  const handleRunFullSwarm = () => {
+  const fetchMultiAgentData = async () => {
+    try {
+      setError(null);
+      const res = await fetch('/api/phase3/multi-agent');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.sharedContext) setSharedContext(data.sharedContext);
+        if (data.handoffs) setHandoffs(data.handoffs);
+      }
+    } catch (err: any) {
+      setError('Error connecting to multi-agent collaboration API.');
+    }
+  };
+
+  useEffect(() => {
+    fetchMultiAgentData();
+  }, []);
+
+  const handleRunFullSwarm = async () => {
     setIsSwarmRunning(true);
-    setTimeout(() => {
-      const newHandoff: AgentHandoffRecord = {
-        id: `h_${Date.now()}`,
-        fromAgent: 'qa',
-        toAgent: 'security',
-        taskTitle: 'Automated OWASP Security & JWT Verification Audit',
-        outputSummary: 'Verified 0 token leaks, 0 unhandled promise rejections',
-        timestamp: 'Just now',
-        status: 'passed'
-      };
-      setHandoffs((prev) => [newHandoff, ...prev]);
+    setError(null);
+    try {
+      const res = await fetch('/api/phase3/multi-agent/run-swarm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: 'Execute full 9-agent platform synthesis' })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.sharedContext) setSharedContext(data.sharedContext);
+        if (data.handoffs) setHandoffs(data.handoffs);
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Swarm execution failed.');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Error executing agent swarm.');
+    } finally {
       setIsSwarmRunning(false);
-    }, 1500);
+    }
   };
 
   const selectedAgent = agentsList.find((a) => a.id === activeRole) || agentsList[0];
@@ -132,11 +119,11 @@ export const MultiAgentCollaboration: React.FC<MultiAgentCollaborationProps> = (
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-extrabold tracking-tight">9-Agent Autonomous Collaboration Swarm</h2>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                Phase 3 Multi-Agent
+                Governed Agent Backend
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Shared Project Context • Agent-to-Agent Handoffs • Task Ownership Matrix • Dependency DAG
+              Shared Project Context Bus • Server-Backed Agent Handoffs • Governed Backend Execution
             </p>
           </div>
         </div>
@@ -150,6 +137,13 @@ export const MultiAgentCollaboration: React.FC<MultiAgentCollaborationProps> = (
           <span>{isSwarmRunning ? 'Executing 9-Agent Swarm...' : 'Trigger Full Swarm Collaboration'}</span>
         </button>
       </div>
+
+      {error && (
+        <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* 9 Agents Selector Matrix */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-2 mb-6">
@@ -192,9 +186,9 @@ export const MultiAgentCollaboration: React.FC<MultiAgentCollaborationProps> = (
           <div className="space-y-2 text-xs text-slate-300">
             <span className="text-[10px] font-bold uppercase text-slate-400 block">Agent Scope & Responsibilities</span>
             <ul className="space-y-1 text-[11px] list-disc list-inside font-mono text-slate-400">
-              <li>Reads & writes shared project context bus</li>
+              <li>Governed execution via /api/ai/agent-task</li>
+              <li>Reads & writes persistent shared project context bus</li>
               <li>Performs automated handoffs to dependent agents</li>
-              <li>Outputs validated artifacts directly to VFS</li>
             </ul>
           </div>
         </div>
@@ -237,31 +231,35 @@ export const MultiAgentCollaboration: React.FC<MultiAgentCollaborationProps> = (
             <GitPullRequest className="w-4 h-4 text-purple-400" />
             Agent-to-Agent Handoff Execution History ({handoffs.length})
           </span>
-          <span className="text-[10px] text-slate-500 font-mono">Dependency Graph Aware</span>
+          <span className="text-[10px] text-slate-500 font-mono">Governed Backend Execution</span>
         </div>
 
-        <div className="space-y-2">
-          {handoffs.map((h) => (
-            <div key={h.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs font-mono">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-500/20 text-purple-300">
-                  {h.fromAgent}
-                </span>
-                <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-indigo-500/20 text-indigo-300">
-                  {h.toAgent}
-                </span>
-                <span className="text-slate-200 font-bold truncate">{h.taskTitle}</span>
-              </div>
+        <div className="space-y-2 max-h-60 overflow-y-auto">
+          {handoffs.length === 0 ? (
+            <div className="p-4 text-center text-xs text-slate-500 font-mono">No agent handoffs recorded yet. Click "Trigger Full Swarm Collaboration" to execute.</div>
+          ) : (
+            handoffs.map((h) => (
+              <div key={h.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs font-mono">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-500/20 text-purple-300">
+                    {h.fromAgent}
+                  </span>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-indigo-500/20 text-indigo-300">
+                    {h.toAgent}
+                  </span>
+                  <span className="text-slate-200 font-bold truncate">{h.taskTitle}</span>
+                </div>
 
-              <div className="flex items-center gap-3 shrink-0 text-[11px]">
-                <span className="text-slate-400 truncate max-w-xs">{h.outputSummary}</span>
-                <span className="text-emerald-400 font-bold flex items-center gap-1">
-                  <Check className="w-3.5 h-3.5" /> PASSED
-                </span>
+                <div className="flex items-center gap-3 shrink-0 text-[11px]">
+                  <span className="text-slate-400 truncate max-w-xs">{h.outputSummary}</span>
+                  <span className="text-emerald-400 font-bold flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5" /> PASSED
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
     </div>

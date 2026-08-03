@@ -1,17 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Rocket,
   CheckCircle2,
   AlertTriangle,
   FileText,
   Sparkles,
-  GitCommit,
   ShieldCheck,
   Check,
   Copy,
-  Download,
-  Calendar,
-  Layers,
   Award
 } from 'lucide-react';
 import { ReleaseCandidate } from '../../types';
@@ -29,82 +25,85 @@ export const AiReleaseManager: React.FC<AiReleaseManagerProps> = ({
 
   const [semverType, setSemverType] = useState<'major' | 'minor' | 'patch'>('minor');
   const [isCreatingRelease, setIsCreatingRelease] = useState(false);
+  const [isDeploying, setIsDeploying] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [releases, setReleases] = useState<ReleaseCandidate[]>([]);
 
-  // Release Candidates State
-  const [releases, setReleases] = useState<ReleaseCandidate[]>([
-    {
-      id: 'rel_250',
-      version: 'v2.5.0-rc1',
-      semverType: 'minor',
-      releaseNotes: `### OPROX Code / AI — v2.5.0 Official Release Candidate
-
-#### 🚀 New Features & Capabilities
-- **AI Project Generator**: Added 6-step project wizard with template, architecture, stack, DB, auth, and deployment target selection.
-- **9-Agent Swarm Collaboration**: Real multi-agent collaboration with shared project context bus and automated handoffs.
-- **AI Task Execution Pipeline**: Integrated DAG task execution queue with parallel processing, retries, and cancellation.
-- **Live Workspace Sync**: Real-time VFS file, build, Vitest coverage, Git branch, and Cloud Run container status monitoring.
-- **AI Release Manager**: Automated release candidate creation, semantic versioning, and production readiness scoring.
-
-#### 🛡️ Security & Performance Audit
-- 0 OWASP vulnerabilities detected
-- 100% Vitest assertions green (14/14 passed)
-- Bundled artifact size: 412.5 KB (optimized CJS build)
-`,
-      readinessScore: 98,
-      goNoGo: 'GO',
-      checklist: [
-        { id: 'c1', label: 'All Vitest Unit & Integration Suites Green', completed: true },
-        { id: 'c2', label: 'OWASP Security & JWT Authorization Pass', completed: true },
-        { id: 'c3', label: 'Drizzle Schema Migrations Verified', completed: true },
-        { id: 'c4', label: 'Cloud Run Port 3000 Ingress Operational', completed: true },
-        { id: 'c5', label: 'AI Wallet & CostGuard Limits Verified', completed: true }
-      ],
-      createdAt: 'Just now',
-      status: 'approved'
+  const fetchReleaseData = async () => {
+    try {
+      setError(null);
+      const res = await fetch('/api/phase3/release-manager');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.releases) setReleases(data.releases);
+      }
+    } catch (err: any) {
+      setError('Error connecting to release manager API.');
     }
-  ]);
+  };
+
+  useEffect(() => {
+    fetchReleaseData();
+  }, []);
 
   const currentRelease = releases[0];
 
-  const handleCreateNewRelease = () => {
+  const handleCreateNewRelease = async () => {
     setIsCreatingRelease(true);
-    setTimeout(() => {
-      const nextVer = semverType === 'major' ? 'v3.0.0-rc1' : semverType === 'minor' ? 'v2.6.0-rc1' : 'v2.5.1-rc1';
-      const newRelease: ReleaseCandidate = {
-        id: `rel_${Date.now()}`,
-        version: nextVer,
-        semverType: semverType,
-        releaseNotes: `### OPROX Release Candidate ${nextVer}\n\nAutomated synthesis of workspace changes and patches. All security and QA audits passed successfully.`,
-        readinessScore: 100,
-        goNoGo: 'GO',
-        checklist: [
-          { id: 'c1', label: 'All Vitest Unit & Integration Suites Green', completed: true },
-          { id: 'c2', label: 'OWASP Security & JWT Authorization Pass', completed: true },
-          { id: 'c3', label: 'Drizzle Schema Migrations Verified', completed: true },
-          { id: 'c4', label: 'Cloud Run Port 3000 Ingress Operational', completed: true }
-        ],
-        createdAt: 'Just now',
-        status: 'approved'
-      };
-      setReleases((prev) => [newRelease, ...prev]);
+    setError(null);
+    try {
+      const res = await fetch('/api/phase3/release-manager/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ semverType })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.releases) setReleases(data.releases);
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Failed to create release candidate.');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Error creating release candidate.');
+    } finally {
       setIsCreatingRelease(false);
-    }, 1200);
+    }
   };
 
   const handleCopyNotes = () => {
-    navigator.clipboard.writeText(currentRelease.releaseNotes);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (currentRelease?.releaseNotes) {
+      navigator.clipboard.writeText(currentRelease.releaseNotes);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
-  const handleTriggerDeploy = () => {
-    if (onDeployRelease && currentRelease) {
-      onDeployRelease(currentRelease);
+  const handleTriggerDeploy = async () => {
+    setIsDeploying(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/phase3/release-manager/deploy', {
+        method: 'POST'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (onDeployRelease && currentRelease) {
+          onDeployRelease(currentRelease);
+        }
+        setReleases((prev) =>
+          prev.map((r, i) => (i === 0 ? { ...r, status: 'released' as const } : r))
+        );
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Deployment failed.');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Error triggering release deployment.');
+    } finally {
+      setIsDeploying(false);
     }
-    setReleases((prev) =>
-      prev.map((r, i) => (i === 0 ? { ...r, status: 'released' as const } : r))
-    );
   };
 
   return (
@@ -121,11 +120,11 @@ export const AiReleaseManager: React.FC<AiReleaseManagerProps> = ({
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-extrabold tracking-tight">AI Release Manager & Production Readiness</h2>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                Phase 3 Release
+                Authoritative Release Gate
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Release Candidates • SemVer Calculator • Production Readiness Report • Deployment Checklist
+              Real Readiness Scoring • Dynamic SemVer • Real Commit Release Notes • Explicit Provider Guard
             </p>
           </div>
         </div>
@@ -156,12 +155,19 @@ export const AiReleaseManager: React.FC<AiReleaseManagerProps> = ({
         </div>
       </div>
 
+      {error && (
+        <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
       {/* Readiness Report Card */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
           <div>
             <span className="text-xs font-bold text-slate-400 uppercase block">Active Release Version</span>
-            <span className="text-xl font-mono font-extrabold text-emerald-400">{currentRelease?.version}</span>
+            <span className="text-xl font-mono font-extrabold text-emerald-400">{currentRelease?.version || 'v1.0.0-rc1'}</span>
           </div>
           <Rocket className="w-8 h-8 text-emerald-400 opacity-80" />
         </div>
@@ -169,7 +175,7 @@ export const AiReleaseManager: React.FC<AiReleaseManagerProps> = ({
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
           <div>
             <span className="text-xs font-bold text-slate-400 uppercase block">Readiness Index</span>
-            <span className="text-2xl font-extrabold text-emerald-400">{currentRelease?.readinessScore}/100</span>
+            <span className="text-2xl font-extrabold text-emerald-400">{currentRelease?.readinessScore ?? 0}/100</span>
           </div>
           <Award className="w-8 h-8 text-emerald-400 opacity-80" />
         </div>
@@ -177,7 +183,9 @@ export const AiReleaseManager: React.FC<AiReleaseManagerProps> = ({
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
           <div>
             <span className="text-xs font-bold text-slate-400 uppercase block">Production Gate</span>
-            <span className="text-xl font-extrabold text-emerald-400">{currentRelease?.goNoGo}</span>
+            <span className={`text-xl font-extrabold ${currentRelease?.goNoGo === 'GO' ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {currentRelease?.goNoGo || 'NO-GO'}
+            </span>
           </div>
           <ShieldCheck className="w-8 h-8 text-emerald-400 opacity-80" />
         </div>
@@ -185,10 +193,10 @@ export const AiReleaseManager: React.FC<AiReleaseManagerProps> = ({
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center">
           <button
             onClick={handleTriggerDeploy}
-            disabled={currentRelease?.status === 'released'}
+            disabled={isDeploying || currentRelease?.status === 'released'}
             className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
           >
-            <Rocket className="w-4 h-4" />
+            <Rocket className={`w-4 h-4 ${isDeploying ? 'animate-spin' : ''}`} />
             <span>{currentRelease?.status === 'released' ? 'RELEASE DEPLOYED TO PROD' : 'DEPLOY RELEASE TO PROD'}</span>
           </button>
         </div>
@@ -206,8 +214,12 @@ export const AiReleaseManager: React.FC<AiReleaseManagerProps> = ({
           <div className="space-y-2">
             {currentRelease?.checklist.map((item) => (
               <div key={item.id} className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center gap-2 text-xs">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span className="text-slate-200 font-mono text-[11px]">{item.label}</span>
+                {item.completed ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                )}
+                <span className={`font-mono text-[11px] ${item.completed ? 'text-slate-200' : 'text-amber-300'}`}>{item.label}</span>
               </div>
             ))}
           </div>
@@ -217,7 +229,7 @@ export const AiReleaseManager: React.FC<AiReleaseManagerProps> = ({
         <div className="lg:col-span-2 p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
           <div className="flex items-center justify-between pb-2 border-b border-slate-800">
             <span className="text-xs font-bold text-emerald-400 uppercase flex items-center gap-2">
-              <FileText className="w-4 h-4" /> Synthesized Release Notes ({currentRelease?.version})
+              <FileText className="w-4 h-4" /> Synthesized Release Notes ({currentRelease?.version || 'Draft'})
             </span>
 
             <button
@@ -230,12 +242,8 @@ export const AiReleaseManager: React.FC<AiReleaseManagerProps> = ({
           </div>
 
           <textarea
-            value={currentRelease?.releaseNotes}
-            onChange={(e) =>
-              setReleases((prev) =>
-                prev.map((r, i) => (i === 0 ? { ...r, releaseNotes: e.target.value } : r))
-              )
-            }
+            value={currentRelease?.releaseNotes || ''}
+            readOnly
             rows={10}
             className="w-full p-4 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-emerald-300 leading-relaxed focus:outline-none focus:border-emerald-500 transition-colors"
           />

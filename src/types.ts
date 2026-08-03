@@ -259,11 +259,11 @@ export interface PipelineTaskNode {
 }
 
 export interface WorkspaceSyncState {
-  fileState: { totalFiles: number; dirtyFiles: number; syncStatus: 'synced' | 'syncing' | 'error' };
-  buildState: { status: 'idle' | 'building' | 'success' | 'failed'; bundleSize: string; lastBuildTime: string };
+  fileState: { totalFiles: number; dirtyFiles: number; syncStatus: 'synced' | 'syncing' | 'dirty' | 'error' };
+  buildState: { status: 'idle' | 'building' | 'success' | 'failed' | 'not_built'; bundleSize: string; lastBuildTime: string };
   testState: { totalTests: number; passed: number; failed: number; coverage: string };
   gitState: { branch: string; commitHash: string; uncommittedChanges: number };
-  deploymentState: { target: string; status: 'active' | 'deploying' | 'offline'; health: string; url: string };
+  deploymentState: { target: string; status: 'active' | 'deploying' | 'offline' | 'NOT_CONFIGURED'; health: string; url: string };
 }
 
 export interface ReleaseCandidate {
@@ -272,7 +272,7 @@ export interface ReleaseCandidate {
   semverType: 'major' | 'minor' | 'patch';
   releaseNotes: string;
   readinessScore: number;
-  goNoGo: 'GO' | 'NO_GO';
+  goNoGo: 'GO' | 'NO_GO' | 'NO-GO';
   checklist: { id: string; label: string; completed: boolean }[];
   createdAt: string;
   status: 'draft' | 'approved' | 'released';

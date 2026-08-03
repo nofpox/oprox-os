@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Sparkles,
   Compass,
@@ -14,11 +14,10 @@ import {
   Terminal,
   Rocket,
   Cloud,
-  CheckCircle2,
   Play,
   ArrowRight,
-  RotateCcw,
-  Check
+  Check,
+  AlertTriangle
 } from 'lucide-react';
 import { LifecycleStage } from '../../types';
 
@@ -37,6 +36,14 @@ export const EndToEndLifecycleEngine: React.FC<EndToEndLifecycleEngineProps> = (
 
   const [currentStage, setCurrentStage] = useState<LifecycleStage>('idea');
   const [isAutoExecuting, setIsAutoExecuting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lifecycleState, setLifecycleState] = useState<{
+    currentStage: LifecycleStage;
+    stageOutputs: Record<string, { status: string; output?: string; error?: string }>;
+  }>({
+    currentStage: 'idea',
+    stageOutputs: {}
+  });
 
   const stages: { id: LifecycleStage; label: string; phase: string; icon: React.ReactNode; moduleId: string }[] = [
     { id: 'idea', label: 'Idea & Setup', phase: 'Phase 3', icon: <Sparkles className="w-3.5 h-3.5" />, moduleId: 'generator' },
@@ -55,25 +62,53 @@ export const EndToEndLifecycleEngine: React.FC<EndToEndLifecycleEngineProps> = (
     { id: 'deployment', label: 'Cloud Run Live', phase: 'Phase 3', icon: <Cloud className="w-3.5 h-3.5" />, moduleId: 'sync' }
   ];
 
+  const fetchLifecycle = async () => {
+    try {
+      setError(null);
+      const res = await fetch('/api/phase3/lifecycle');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.lifecycle) {
+          setLifecycleState(data.lifecycle);
+          setCurrentStage(data.lifecycle.currentStage || 'idea');
+        }
+      }
+    } catch (err: any) {
+      setError('Error connecting to lifecycle engine API.');
+    }
+  };
+
+  useEffect(() => {
+    fetchLifecycle();
+  }, []);
+
   const currentStageIndex = stages.findIndex((s) => s.id === currentStage);
 
-  const handleAutoExecuteLifecycle = () => {
+  const handleAutoExecuteLifecycle = async () => {
     setIsAutoExecuting(true);
-    let idx = 0;
-    const interval = setInterval(() => {
-      idx++;
-      if (idx < stages.length) {
-        setCurrentStage(stages[idx].id);
-      } else {
-        clearInterval(interval);
-        setIsAutoExecuting(false);
+    setError(null);
+    try {
+      const res = await fetch('/api/phase3/lifecycle/auto-run', { method: 'POST' });
+      const data = await res.json();
+      if (data.lifecycle) {
+        setLifecycleState(data.lifecycle);
+        setCurrentStage(data.lifecycle.currentStage);
       }
-    }, 600);
+      if (!res.ok || data.success === false) {
+        setError(data.message || data.error || 'Lifecycle auto-run stopped at blocking failure.');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Error executing lifecycle auto-run.');
+    } finally {
+      setIsAutoExecuting(false);
+    }
   };
 
   const handleNavigate = (moduleId: string) => {
     if (onNavigateModule) onNavigateModule(moduleId);
   };
+
+  const activeStageDetails = lifecycleState.stageOutputs?.[currentStage];
 
   return (
     <div className={`p-6 rounded-3xl border transition-colors shadow-2xl ${
@@ -89,7 +124,7 @@ export const EndToEndLifecycleEngine: React.FC<EndToEndLifecycleEngineProps> = (
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-extrabold tracking-tight">End-to-End Autonomous Project Lifecycle Engine</h2>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                14-Stage Pipeline
+                Authoritative 14-Stage Orchestrator
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
@@ -108,11 +143,21 @@ export const EndToEndLifecycleEngine: React.FC<EndToEndLifecycleEngineProps> = (
         </button>
       </div>
 
+      {error && (
+        <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
       {/* 14 Lifecycle Stages Flow Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-6">
         {stages.map((st, i) => {
           const isActive = currentStage === st.id;
-          const isPassed = i < currentStageIndex;
+          const stageState = lifecycleState.stageOutputs?.[st.id];
+          const isCompleted = stageState?.status === 'completed';
+          const isFailed = stageState?.status === 'failed';
+
           return (
             <button
               key={st.id}
@@ -120,14 +165,17 @@ export const EndToEndLifecycleEngine: React.FC<EndToEndLifecycleEngineProps> = (
               className={`p-2.5 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                 isActive
                   ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-lg shadow-emerald-500/20 font-extrabold'
-                  : isPassed
+                  : isFailed
+                  ? 'bg-rose-950/60 border-rose-500/80 text-rose-300'
+                  : isCompleted
                   ? 'bg-slate-900 border-slate-800 text-emerald-400'
                   : 'bg-slate-950 border-slate-800/80 text-slate-400 hover:text-slate-200'
               }`}
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[9px] font-mono font-bold uppercase">{st.phase}</span>
-                {isPassed && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                {isCompleted && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                {isFailed && <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />}
               </div>
               <div className="flex items-center gap-1.5 truncate">
                 {st.icon}
@@ -146,11 +194,11 @@ export const EndToEndLifecycleEngine: React.FC<EndToEndLifecycleEngineProps> = (
               Active Stage [{currentStageIndex + 1}/14]: {stages[currentStageIndex]?.label}
             </span>
             <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-950 text-slate-300">
-              {stages[currentStageIndex]?.phase}
+              STATUS: {activeStageDetails?.status?.toUpperCase() || 'PENDING'}
             </span>
           </div>
-          <p className="text-xs text-slate-300">
-            Lifecycle stage fully integrated with underlying Phase 1, Phase 2, and Phase 3 engines.
+          <p className="text-xs text-slate-300 font-mono">
+            {activeStageDetails?.output || activeStageDetails?.error || 'Lifecycle stage connected to authoritative backend engines.'}
           </p>
         </div>
 

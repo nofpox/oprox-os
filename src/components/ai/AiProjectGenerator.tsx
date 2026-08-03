@@ -1,21 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FolderPlus,
   Sparkles,
-  Layers,
   Cpu,
-  Database,
-  Lock,
-  Cloud,
   CheckCircle2,
   ArrowRight,
   ArrowLeft,
   Check,
-  Code2,
   Box,
   Server,
   Globe,
-  Smartphone
+  Smartphone,
+  AlertTriangle
 } from 'lucide-react';
 import { ProjectGeneratorConfig } from '../../types';
 
@@ -33,6 +29,7 @@ export const AiProjectGenerator: React.FC<AiProjectGeneratorProps> = ({
   const [wizardStep, setWizardStep] = useState<number>(1);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedSuccess, setGeneratedSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Form Config
   const [config, setConfig] = useState<ProjectGeneratorConfig>({
@@ -95,42 +92,31 @@ export const AiProjectGenerator: React.FC<AiProjectGeneratorProps> = ({
     { id: 'kubernetes', title: 'Kubernetes Cluster (K8s)', desc: 'Enterprise helm chart container cluster' }
   ];
 
-  const handleGenerateProject = () => {
+  const handleGenerateProject = async () => {
     setIsGenerating(true);
-    setTimeout(() => {
-      const scaffoldFiles = [
-        {
-          path: 'package.json',
-          content: JSON.stringify(
-            {
-              name: config.projectName.toLowerCase().replace(/\s+/g, '-'),
-              version: '1.0.0',
-              description: config.description,
-              scripts: {
-                dev: 'tsx server.ts',
-                build: 'vite build',
-                start: 'node dist/server.cjs'
-              }
-            },
-            null,
-            2
-          )
-        },
-        {
-          path: 'README.md',
-          content: `# ${config.projectName}\n\n${config.description}\n\n## Architecture\n- **Type**: ${config.architecture}\n- **Stack**: ${config.techStack}\n- **DB**: ${config.database}\n- **Auth**: ${config.auth}\n- **Deploy**: ${config.deploymentTarget}\n`
-        },
-        {
-          path: 'src/config/project.json',
-          content: JSON.stringify(config, null, 2)
+    setError(null);
+    try {
+      const res = await fetch('/api/phase3/project-generator/synthesize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setGeneratedSuccess(true);
+        if (onProjectGenerated) {
+          onProjectGenerated(data.projectConfig, data.generatedFiles);
         }
-      ];
-
+        setTimeout(() => setGeneratedSuccess(false), 3000);
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Failed to synthesize project.');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Error communicating with project generator backend.');
+    } finally {
       setIsGenerating(false);
-      setGeneratedSuccess(true);
-      if (onProjectGenerated) onProjectGenerated(config, scaffoldFiles);
-      setTimeout(() => setGeneratedSuccess(false), 3000);
-    }, 1500);
+    }
   };
 
   return (
@@ -147,11 +133,11 @@ export const AiProjectGenerator: React.FC<AiProjectGeneratorProps> = ({
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-extrabold tracking-tight">AI Project Generator & Scaffold Wizard</h2>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                Phase 3 Engine
+                Authoritative VFS Scaffold
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Full Project Generation • Template Selection • Tech Stack & Architecture Topology
+              Multi-File Scaffold Synthesis • Real VFS Scaffolding • Workspace Integration
             </p>
           </div>
         </div>
@@ -175,6 +161,13 @@ export const AiProjectGenerator: React.FC<AiProjectGeneratorProps> = ({
           ))}
         </div>
       </div>
+
+      {error && (
+        <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* Step 1: Project Metadata */}
       {wizardStep === 1 && (

@@ -8,6 +8,7 @@ import { Server } from 'http';
 
 import adminRoutes from './server/adminRoutes';
 import stripeWebhookRouter from './server/stripeWebhook';
+import phase3Routes from './server/phase3Routes';
 import { aiGovernanceGate } from './server/aiGovernance';
 import { logSecurityAudit } from './server/audit';
 import { AuthRequest, requireAuth } from './server/auth';
@@ -153,6 +154,7 @@ app.get(['/api/readiness', '/readyz'], async (req, res) => {
 
 // Mount Protected Admin & Auth Routes
 app.use(adminRoutes);
+app.use(phase3Routes);
 
 // Phase 4: Billing, Subscriptions & Invoicing API Routes
 app.post('/api/billing/subscriptions', requireAuth, async (req: AuthRequest, res) => {

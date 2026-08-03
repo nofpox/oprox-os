@@ -1,19 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   RefreshCw,
   FolderTree,
-  FileCode,
-  CheckCircle2,
   Terminal,
   Cpu,
   GitBranch,
   Cloud,
-  Globe,
-  Check,
-  Zap,
-  Play,
   Activity,
-  ShieldCheck
+  AlertTriangle
 } from 'lucide-react';
 import { WorkspaceSyncState } from '../../types';
 
@@ -27,25 +21,57 @@ export const LiveWorkspaceSync: React.FC<LiveWorkspaceSyncProps> = ({
   const isDark = theme === 'dark';
 
   const [isSyncing, setIsSyncing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [syncState, setSyncState] = useState<WorkspaceSyncState>({
-    fileState: { totalFiles: 48, dirtyFiles: 0, syncStatus: 'synced' },
-    buildState: { status: 'success', bundleSize: '412.5 KB', lastBuildTime: 'Just now' },
-    testState: { totalTests: 14, passed: 14, failed: 0, coverage: '98.4%' },
-    gitState: { branch: 'main', commitHash: '7f9a2b0', uncommittedChanges: 0 },
-    deploymentState: { target: 'Google Cloud Run', status: 'active', health: '100% Operational', url: 'https://ais-dev-ipdlb44t6phtncragxjdig-621512906122.europe-west2.run.app' }
+    fileState: { totalFiles: 0, dirtyFiles: 0, syncStatus: 'synced' },
+    buildState: { status: 'not_built', bundleSize: 'N/A', lastBuildTime: 'N/A' },
+    testState: { totalTests: 0, passed: 0, failed: 0, coverage: '0%' },
+    gitState: { branch: 'main', commitHash: 'fetching...', uncommittedChanges: 0 },
+    deploymentState: { target: 'Google Cloud Run', status: 'NOT_CONFIGURED', health: 'NOT_CONFIGURED', url: 'NOT_CONFIGURED' }
   });
 
-  const handleForceSync = () => {
-    setIsSyncing(true);
-    setTimeout(() => {
-      setSyncState((prev) => ({
-        ...prev,
-        fileState: { ...prev.fileState, syncStatus: 'synced', dirtyFiles: 0 },
-        buildState: { ...prev.buildState, status: 'success', lastBuildTime: 'Just now' }
-      }));
-      setIsSyncing(false);
-    }, 1200);
+  const fetchSyncState = async () => {
+    try {
+      setError(null);
+      const res = await fetch('/api/phase3/workspace-sync');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.syncState) {
+          setSyncState(data.syncState);
+        }
+      } else {
+        setError('Failed to fetch workspace sync state from server.');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Error connecting to workspace sync API.');
+    }
   };
+
+  useEffect(() => {
+    fetchSyncState();
+  }, []);
+
+  const handleForceSync = async () => {
+    setIsSyncing(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/phase3/force-vfs-sync', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.syncState) {
+          setSyncState(data.syncState);
+        }
+      } else {
+        setError('Failed to force VFS sync.');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Error executing force VFS sync.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const isDeployed = syncState.deploymentState.status !== 'NOT_CONFIGURED';
 
   return (
     <div className={`p-6 rounded-3xl border transition-colors shadow-2xl ${
@@ -61,11 +87,11 @@ export const LiveWorkspaceSync: React.FC<LiveWorkspaceSyncProps> = ({
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-extrabold tracking-tight">Live Workspace Synchronization</h2>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                Real-Time VFS Sync
+                Authoritative Server Sync
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Live Monitoring for File VFS State • Build Artifacts • Vitest Coverage • Git Branch • Cloud Run Target
+              Authoritative Monitoring: VFS File Count • Build Artifact Size • Vitest Suite • Git HEAD • Deployment Ingress
             </p>
           </div>
         </div>
@@ -80,6 +106,13 @@ export const LiveWorkspaceSync: React.FC<LiveWorkspaceSyncProps> = ({
         </button>
       </div>
 
+      {error && (
+        <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
       {/* 5 Synchronization Grid Modules */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Module 1: VFS File State */}
@@ -88,7 +121,9 @@ export const LiveWorkspaceSync: React.FC<LiveWorkspaceSyncProps> = ({
             <span className="text-xs font-bold text-slate-300 uppercase flex items-center gap-2">
               <FolderTree className="w-4 h-4 text-cyan-400" /> VFS File State
             </span>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+              syncState.fileState.syncStatus === 'synced' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+            }`}>
               {syncState.fileState.syncStatus.toUpperCase()}
             </span>
           </div>
@@ -105,14 +140,16 @@ export const LiveWorkspaceSync: React.FC<LiveWorkspaceSyncProps> = ({
             <span className="text-xs font-bold text-slate-300 uppercase flex items-center gap-2">
               <Terminal className="w-4 h-4 text-blue-400" /> Build Engine State
             </span>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+              syncState.buildState.status === 'success' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-400'
+            }`}>
               {syncState.buildState.status.toUpperCase()}
             </span>
           </div>
 
           <div className="space-y-1 font-mono text-xs text-slate-300">
             <div className="flex justify-between"><span>Compiled Bundle Size:</span><span className="text-blue-400 font-bold">{syncState.buildState.bundleSize}</span></div>
-            <div className="flex justify-between"><span>Last Build Time:</span><span className="text-slate-400">{syncState.buildState.lastBuildTime}</span></div>
+            <div className="flex justify-between"><span>Last Build Time:</span><span className="text-slate-400 text-[10px]">{syncState.buildState.lastBuildTime}</span></div>
           </div>
         </div>
 
@@ -145,7 +182,7 @@ export const LiveWorkspaceSync: React.FC<LiveWorkspaceSyncProps> = ({
           </div>
 
           <div className="space-y-1 font-mono text-xs text-slate-300">
-            <div className="flex justify-between"><span>Latest Head Hash:</span><span className="text-purple-400 font-bold">{syncState.gitState.commitHash}</span></div>
+            <div className="flex justify-between"><span>Latest Head Hash:</span><span className="text-purple-400 font-bold truncate max-w-[120px]">{syncState.gitState.commitHash}</span></div>
             <div className="flex justify-between"><span>Uncommitted Staged:</span><span className="text-emerald-400 font-bold">{syncState.gitState.uncommittedChanges}</span></div>
           </div>
         </div>
@@ -154,23 +191,29 @@ export const LiveWorkspaceSync: React.FC<LiveWorkspaceSyncProps> = ({
         <div className="md:col-span-2 lg:col-span-2 p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
           <div className="flex items-center justify-between pb-2 border-b border-slate-800">
             <span className="text-xs font-bold text-slate-300 uppercase flex items-center gap-2">
-              <Cloud className="w-4 h-4 text-emerald-400" /> Cloud Run Container Ingress (Port 3000)
+              <Cloud className="w-4 h-4 text-emerald-400" /> Cloud Run Container Ingress
             </span>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 flex items-center gap-1">
-              <Activity className="w-3 h-3 animate-pulse" /> {syncState.deploymentState.health}
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 ${
+              isDeployed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-400 border border-slate-700'
+            }`}>
+              <Activity className={`w-3 h-3 ${isDeployed ? 'animate-pulse' : ''}`} /> {syncState.deploymentState.health}
             </span>
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 font-mono text-xs text-slate-300">
             <div>
               <span className="text-slate-500 block text-[10px] uppercase">Target Platform</span>
-              <span className="text-emerald-400 font-bold">{syncState.deploymentState.target}</span>
+              <span className={isDeployed ? 'text-emerald-400 font-bold' : 'text-slate-400'}>{syncState.deploymentState.target}</span>
             </div>
             <div className="truncate max-w-sm">
               <span className="text-slate-500 block text-[10px] uppercase">Ingress Endpoint</span>
-              <a href={syncState.deploymentState.url} target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline truncate block">
-                {syncState.deploymentState.url}
-              </a>
+              {isDeployed ? (
+                <a href={syncState.deploymentState.url} target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline truncate block">
+                  {syncState.deploymentState.url}
+                </a>
+              ) : (
+                <span className="text-slate-500 font-mono text-xs">NOT_CONFIGURED</span>
+              )}
             </div>
           </div>
         </div>

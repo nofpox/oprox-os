@@ -2547,3 +2547,100 @@ export const realEstateAiValuationsTable = pgTable(
 );
 
 export type RealEstateAiValuationRow = typeof realEstateAiValuationsTable.$inferSelect;
+
+// ── OPROX REAL ESTATE PHASE 5 TABLES ──────────────────────────────────────
+
+export const realEstateDesignProjectsTable = pgTable(
+  "re_design_projects",
+  {
+    id: text("id").primaryKey(), // dp_xxx
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull(),
+    title: text("title").notNull(),
+    projectType: text("project_type").notNull(), // ARCHITECTURAL | INTERIOR | EXTERIOR | RENOVATION | MULTI_DISCIPLINARY
+    propertyId: text("property_id").references(() => realEstatePropertiesTable.id, { onDelete: "set null" }),
+    unitId: text("unit_id").references(() => realEstateUnitsTable.id, { onDelete: "set null" }),
+    listingId: text("listing_id").references(() => realEstatePublicListingsTable.id, { onDelete: "set null" }),
+    developerProjectId: text("developer_project_id").references(() => realEstateProjectsTable.id, { onDelete: "set null" }),
+    studioProjectId: text("studio_project_id"), // Link to OPROX Studio project if exported
+    status: text("status").notNull().default("ACTIVE"), // DRAFT | ACTIVE | APPROVED | REJECTED | ARCHIVED
+    requirementsJson: jsonb("requirements_json"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_dp_tenant_idx").on(t.tenantId),
+    index("re_dp_user_idx").on(t.userId),
+    index("re_dp_property_idx").on(t.propertyId),
+    index("re_dp_type_idx").on(t.projectType),
+  ]
+);
+
+export type RealEstateDesignProjectRow = typeof realEstateDesignProjectsTable.$inferSelect;
+
+export const realEstateDesignConceptsTable = pgTable(
+  "re_design_concepts",
+  {
+    id: text("id").primaryKey(), // dc_xxx
+    tenantId: text("tenant_id").notNull(),
+    designProjectId: text("design_project_id").notNull().references(() => realEstateDesignProjectsTable.id, { onDelete: "cascade" }),
+    conceptName: text("concept_name").notNull(),
+    conceptType: text("concept_type").notNull(), // ARCHITECTURAL | INTERIOR | EXTERIOR | LANDSCAPE | RENOVATION
+    versionNumber: integer("version_number").notNull().default(1),
+    style: text("style"), // Modern | Contemporary | Minimal | Luxury | Classic | Saudi-inspired | Islamic-inspired | Industrial
+    spacePlanningJson: jsonb("space_planning_json"),
+    interiorDetailsJson: jsonb("interior_details_json"),
+    exteriorDetailsJson: jsonb("exterior_details_json"),
+    renovationDetailsJson: jsonb("renovation_details_json"),
+    rationale: text("rationale"),
+    approvalStatus: text("approval_status").notNull().default("CONCEPTUAL"), // CONCEPTUAL | REVIEWED | APPROVED | REJECTED
+    isConceptualNotice: boolean("is_conceptual_notice").notNull().default(true),
+    aiGenerated: boolean("ai_generated").notNull().default(true),
+    aiModelUsed: text("ai_model_used"),
+    mediaJson: jsonb("media_json"),
+    model3dStatus: text("model3d_status").default("NOT_CONFIGURED"), // NOT_CONFIGURED | PENDING | READY
+    spatialMetaJson: jsonb("spatial_meta_json"), // Phase 6 readiness
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_dc_tenant_idx").on(t.tenantId),
+    index("re_dc_project_idx").on(t.designProjectId),
+    index("re_dc_type_idx").on(t.conceptType),
+  ]
+);
+
+export type RealEstateDesignConceptRow = typeof realEstateDesignConceptsTable.$inferSelect;
+
+export const realEstateInvestmentAnalysesTable = pgTable(
+  "re_investment_analyses",
+  {
+    id: text("id").primaryKey(), // inv_xxx
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull(),
+    title: text("title").notNull(),
+    propertyId: text("property_id").references(() => realEstatePropertiesTable.id, { onDelete: "set null" }),
+    listingId: text("listing_id").references(() => realEstatePublicListingsTable.id, { onDelete: "set null" }),
+    purchasePriceSar: numeric("purchase_price_sar").notNull(),
+    areaSqm: numeric("area_sqm").notNull(),
+    estimatedAnnualRentSar: numeric("estimated_annual_rent_sar").notNull(),
+    operatingExpensesAnnualSar: numeric("operating_expenses_annual_sar").default("0"),
+    occupancyRatePct: numeric("occupancy_rate_pct").default("95"),
+    financingPercentagePct: numeric("financing_percentage_pct").default("0"),
+    mortgageInterestRatePct: numeric("mortgage_interest_rate_pct").default("0"),
+    loanTenureYears: integer("loan_tenure_years").default(20),
+    calculatedMetricsJson: jsonb("calculated_metrics_json").notNull(),
+    comparablePropertiesJson: jsonb("comparable_properties_json"),
+    dataQualityStatus: text("data_quality_status").notNull().default("ACTUAL_AND_ESTIMATED"), // ACTUAL | ESTIMATED | NOT_MEASURED | DATA_UNAVAILABLE
+    aiAnalysisSummary: text("ai_analysis_summary"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_inv_tenant_idx").on(t.tenantId),
+    index("re_inv_user_idx").on(t.userId),
+    index("re_inv_property_idx").on(t.propertyId),
+  ]
+);
+
+export type RealEstateInvestmentAnalysisRow = typeof realEstateInvestmentAnalysesTable.$inferSelect;

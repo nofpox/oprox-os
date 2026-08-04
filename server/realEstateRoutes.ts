@@ -120,6 +120,27 @@ import {
   updateInquiryStatus,
   getPhase4MarketplaceMetrics,
 } from '../src/lib/realestate/realEstatePhase4Store';
+import {
+  createDesignProject,
+  getDesignProject,
+  listDesignProjects,
+  updateDesignProject,
+  deleteDesignProject,
+  createDesignConcept,
+  listDesignConcepts,
+  getDesignConcept,
+  updateConceptApproval,
+  generateAiArchitectConcept,
+  generateAiInteriorConcept,
+  generateAiExteriorConcept,
+  generateAiRenovationConcept,
+  exportDesignProjectToStudio,
+  createInvestmentAnalysis,
+  getInvestmentAnalysis,
+  listInvestmentAnalyses,
+  compareInvestments,
+  askAiInvestmentAdvisor,
+} from '../src/lib/realestate/realEstatePhase5Store';
 
 const router = Router();
 
@@ -1535,6 +1556,238 @@ router.get('/api/real-estate/marketplace/metrics', requireAuth, async (req: Auth
     res.json({ success: true, metrics });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || 'Failed to fetch marketplace metrics.' });
+  }
+});
+
+// ── PHASE 5: DESIGN PROJECTS & CONCEPTS WORKSPACE ─────────────────────────
+
+router.get('/api/real-estate/design-projects', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const projects = await listDesignProjects(tenantId, {
+      userId: req.query.userId as string,
+      projectType: req.query.projectType as string,
+      propertyId: req.query.propertyId as string,
+      status: req.query.status as string,
+    });
+    res.json({ success: true, projects });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list design projects.' });
+  }
+});
+
+router.post('/api/real-estate/design-projects', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const userId = req.user!.id;
+    const project = await createDesignProject({ ...req.body, tenantId, userId });
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'CREATE_DESIGN_PROJECT', projectId: project.id });
+    res.json({ success: true, project });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to create design project.' });
+  }
+});
+
+router.get('/api/real-estate/design-projects/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const project = await getDesignProject(tenantId, req.params.id);
+    if (!project) return res.status(404).json({ error: 'Design project not found.' });
+    res.json({ success: true, project });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch design project.' });
+  }
+});
+
+router.put('/api/real-estate/design-projects/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const project = await updateDesignProject(tenantId, req.params.id, req.body);
+    if (!project) return res.status(404).json({ error: 'Design project not found.' });
+    res.json({ success: true, project });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to update design project.' });
+  }
+});
+
+router.delete('/api/real-estate/design-projects/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const deleted = await deleteDesignProject(tenantId, req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Design project not found.' });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to delete design project.' });
+  }
+});
+
+// Concepts
+router.get('/api/real-estate/design-projects/:id/concepts', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const concepts = await listDesignConcepts(tenantId, req.params.id);
+    res.json({ success: true, concepts });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list design concepts.' });
+  }
+});
+
+router.post('/api/real-estate/design-concepts', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const concept = await createDesignConcept({ ...req.body, tenantId });
+    res.json({ success: true, concept });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to create design concept.' });
+  }
+});
+
+router.get('/api/real-estate/design-concepts/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const concept = await getDesignConcept(tenantId, req.params.id);
+    if (!concept) return res.status(404).json({ error: 'Design concept not found.' });
+    res.json({ success: true, concept });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch design concept.' });
+  }
+});
+
+router.put('/api/real-estate/design-concepts/:id/approval', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { status } = req.body;
+    if (!status) return res.status(400).json({ error: 'Field "status" is required.' });
+
+    const concept = await updateConceptApproval(tenantId, req.params.id, status);
+    if (!concept) return res.status(404).json({ error: 'Design concept not found.' });
+    res.json({ success: true, concept });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to update concept approval.' });
+  }
+});
+
+// Studio Export Integration Boundary
+router.post('/api/real-estate/design-projects/:id/export-studio', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const result = await exportDesignProjectToStudio(tenantId, req.params.id);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to export design project to OPROX Studio.' });
+  }
+});
+
+// ── PHASE 5: AI GENERATOR SERVICES ────────────────────────────────────────
+
+router.post('/api/real-estate/ai/architect', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const userId = req.user!.id;
+    const result = await generateAiArchitectConcept({ ...req.body, tenantId, userId });
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'AI_ARCHITECT_GENERATE', projectId: result.project.id });
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to generate AI architectural concept.' });
+  }
+});
+
+router.post('/api/real-estate/ai/interior', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const userId = req.user!.id;
+    const result = await generateAiInteriorConcept({ ...req.body, tenantId, userId });
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to generate AI interior concept.' });
+  }
+});
+
+router.post('/api/real-estate/ai/exterior', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const userId = req.user!.id;
+    const result = await generateAiExteriorConcept({ ...req.body, tenantId, userId });
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to generate AI exterior concept.' });
+  }
+});
+
+router.post('/api/real-estate/ai/renovation', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const userId = req.user!.id;
+    const result = await generateAiRenovationConcept({ ...req.body, tenantId, userId });
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to generate AI renovation roadmap.' });
+  }
+});
+
+// ── PHASE 5: INVESTMENT INTELLIGENCE ──────────────────────────────────────
+
+router.get('/api/real-estate/investment-analyses', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const analyses = await listInvestmentAnalyses(tenantId, {
+      userId: req.query.userId as string,
+      propertyId: req.query.propertyId as string,
+    });
+    res.json({ success: true, analyses });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list investment analyses.' });
+  }
+});
+
+router.post('/api/real-estate/investment-analyses', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const userId = req.user!.id;
+    const analysis = await createInvestmentAnalysis({ ...req.body, tenantId, userId });
+    res.json({ success: true, analysis });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to create investment analysis.' });
+  }
+});
+
+router.get('/api/real-estate/investment-analyses/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const analysis = await getInvestmentAnalysis(tenantId, req.params.id);
+    if (!analysis) return res.status(404).json({ error: 'Investment analysis not found.' });
+    res.json({ success: true, analysis });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch investment analysis.' });
+  }
+});
+
+router.post('/api/real-estate/investment-compare', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { analysisIds } = req.body;
+    if (!Array.isArray(analysisIds) || analysisIds.length === 0) {
+      return res.status(400).json({ error: 'Field "analysisIds" must be a non-empty array of strings.' });
+    }
+
+    const result = await compareInvestments(tenantId, analysisIds);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to compare investment analyses.' });
+  }
+});
+
+router.post('/api/real-estate/ai/investment-advisor', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const userId = req.user!.id;
+    const { prompt, analysisIds } = req.body;
+    if (!prompt) return res.status(400).json({ error: 'Field "prompt" is required.' });
+
+    const result = await askAiInvestmentAdvisor({ tenantId, userId, prompt, analysisIds });
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to query AI Investment Advisor.' });
   }
 });
 

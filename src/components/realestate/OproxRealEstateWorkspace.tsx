@@ -97,11 +97,12 @@ interface DashboardMetrics {
 }
 
 import { OproxRealEstateMarketplace } from './OproxRealEstateMarketplace';
+import { OproxRealEstatePhase5Suite } from './OproxRealEstatePhase5Suite';
 
 export const OproxRealEstateWorkspace: React.FC = () => {
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'portfolios' | 'properties' | 'units' | 'owners' | 'contacts' | 'tenants' | 'leases' | 'payments' | 'securityDeposits' | 'crmLeads' | 'crmViewings' | 'crmOffers' | 'crmReservations' | 'marketplace'
-  >('marketplace');
+    'overview' | 'portfolios' | 'properties' | 'units' | 'owners' | 'contacts' | 'tenants' | 'leases' | 'payments' | 'securityDeposits' | 'crmLeads' | 'crmViewings' | 'crmOffers' | 'crmReservations' | 'marketplace' | 'phase5Suite'
+  >('phase5Suite');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -570,7 +571,22 @@ export const OproxRealEstateWorkspace: React.FC = () => {
           <Sparkles className="w-4 h-4 text-amber-400" />
           <span>PropTech Marketplace (Phase 4)</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab('phase5Suite')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            activeTab === 'phase5Suite'
+              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+              : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+          <span>AI Design & Investment Suite (Phase 5)</span>
+        </button>
       </div>
+
+      {/* PHASE 5 SUITE TAB */}
+      {activeTab === 'phase5Suite' && <OproxRealEstatePhase5Suite />}
 
       {/* MARKETPLACE TAB */}
       {activeTab === 'marketplace' && <OproxRealEstateMarketplace />}

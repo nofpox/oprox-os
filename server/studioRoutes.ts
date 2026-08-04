@@ -62,6 +62,110 @@ router.post('/api/studio/projects', requireAuth, async (req: AuthRequest, res) =
   }
 });
 
+// 2a. Phase 5 — AI Planning before generation
+router.post('/api/studio/projects/ai-plan', requireAuth, aiGovernanceGate, async (req: AuthRequest, res) => {
+  try {
+    const { prompt } = req.body;
+    if (!prompt || typeof prompt !== 'string') {
+      return res.status(400).json({ error: 'Field "prompt" string is required.' });
+    }
+    const { createStudioAiPlan } = await import('../src/lib/studio/studioPhase5Engine');
+    const plan = createStudioAiPlan(prompt);
+    res.json({ success: true, plan });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'AI planning failed.' });
+  }
+});
+
+// 2b. Phase 5 — AI Application Generation
+router.post('/api/studio/projects/ai-generate', requireAuth, aiGovernanceGate, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const orgId = req.user?.orgId || 'org_default';
+    const userId = req.user!.id;
+    const { name, prompt, plan } = req.body;
+
+    if (!prompt || typeof prompt !== 'string') {
+      return res.status(400).json({ error: 'Field "prompt" string is required.' });
+    }
+
+    const projName = name || 'AI Generated App';
+    const meta = await createStudioProject({
+      tenantId,
+      orgId,
+      name: projName,
+      description: `AI generated from prompt: "${prompt.substring(0, 50)}..."`,
+      createdBy: userId,
+    });
+
+    const { executeStudioAiGeneration } = await import('../src/lib/studio/studioPhase5Engine');
+    const progress = await executeStudioAiGeneration(meta.id, tenantId, projName, prompt);
+
+    if (progress.stage === 'FAILED' || !progress.resultIr) {
+      return res.status(400).json({
+        error: `AI project generation failed: ${progress.error || 'Unknown generation error'}`,
+        stage: progress.stage,
+      });
+    }
+
+    // Save initial generated IR as revision 1
+    await saveStudioProjectIr({
+      projectId: meta.id,
+      tenantId,
+      authorId: userId,
+      baseRevisionNumber: 0,
+      updatedIr: progress.resultIr,
+      changeSummary: 'Initial AI Application Generation',
+    });
+
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'AI_GENERATE_STUDIO_PROJECT', projectId: meta.id, prompt });
+    res.json({ success: true, project: meta, ir: progress.resultIr, plan: progress.plan });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'AI project generation failed.' });
+  }
+});
+
+// 2c. Phase 5 — Duplicate Studio Project
+router.post('/api/studio/projects/:id/duplicate', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const orgId = req.user?.orgId || 'org_default';
+    const userId = req.user!.id;
+
+    const source = await getStudioProjectIr(req.params.id, tenantId);
+    if (!source) {
+      return res.status(404).json({ error: 'Studio project not found or access denied.' });
+    }
+
+    const newName = `${source.meta.name} (Copy)`;
+    const newMeta = await createStudioProject({
+      tenantId,
+      orgId,
+      name: newName,
+      description: source.meta.description,
+      createdBy: userId,
+    });
+
+    const duplicatedIr = JSON.parse(JSON.stringify(source.ir));
+    duplicatedIr.id = newMeta.id;
+    duplicatedIr.name = newName;
+
+    await saveStudioProjectIr({
+      projectId: newMeta.id,
+      tenantId,
+      authorId: userId,
+      baseRevisionNumber: 0,
+      updatedIr: duplicatedIr,
+      changeSummary: 'Duplicated project',
+    });
+
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'DUPLICATE_STUDIO_PROJECT', sourceProjectId: req.params.id, newProjectId: newMeta.id });
+    res.json({ success: true, project: newMeta });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Failed to duplicate Studio project.' });
+  }
+});
+
 // 3. Get Studio Project Meta + IR
 router.get('/api/studio/projects/:id', requireAuth, async (req: AuthRequest, res) => {
   try {

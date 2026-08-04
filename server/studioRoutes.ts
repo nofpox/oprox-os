@@ -332,4 +332,171 @@ router.post('/api/studio/projects/:id/revisions/compare', requireAuth, async (re
   }
 });
 
+// 14. Phase 3 — Full-Stack Bundle Generator
+router.post('/api/studio/projects/:id/fullstack-bundle', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { isKillSwitchActive } = await import('../src/lib/killSwitch');
+    if (await isKillSwitchActive('code_studio') || await isKillSwitchActive('deployments')) {
+      return res.status(503).json({ error: 'GLOBAL_KILLSWITCH_ACTIVE: Studio Phase 3 operations suspended.' });
+    }
+
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const { generateFullStackBundle } = await import('../src/lib/studio/studioPhase3Engine');
+    const bundle = generateFullStackBundle(projectData.ir);
+
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'GENERATE_STUDIO_BUNDLE', projectId: req.params.id });
+    res.json({ success: true, bundle });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Full-stack bundle generation failed.' });
+  }
+});
+
+// 15. Phase 3 — Workspace Export Engine
+router.post('/api/studio/projects/:id/export-workspace', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { isKillSwitchActive } = await import('../src/lib/killSwitch');
+    if (await isKillSwitchActive('code_studio') || await isKillSwitchActive('deployments')) {
+      return res.status(503).json({ error: 'GLOBAL_KILLSWITCH_ACTIVE: Studio Phase 3 operations suspended.' });
+    }
+
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const userId = req.user!.id;
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const { exportStudioToWorkspace } = await import('../src/lib/studio/studioPhase3Engine');
+    const exportResult = exportStudioToWorkspace(projectData.ir, userId);
+
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'EXPORT_STUDIO_WORKSPACE', projectId: req.params.id });
+    res.json({ success: true, ...exportResult });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Workspace export failed.' });
+  }
+});
+
+// 16. Phase 3 — Cloud Deployment Engine
+router.post('/api/studio/projects/:id/deploy', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { isKillSwitchActive } = await import('../src/lib/killSwitch');
+    if (await isKillSwitchActive('deployments')) {
+      return res.status(503).json({ error: 'GLOBAL_KILLSWITCH_ACTIVE: Studio Phase 3 operations suspended.' });
+    }
+
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const userId = req.user!.id;
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const { environment } = req.body;
+    const targetEnv = environment === 'production' ? 'production' : 'staging';
+
+    const { deployStudioApp } = await import('../src/lib/studio/studioPhase3Engine');
+    const deployment = await deployStudioApp(
+      req.params.id,
+      tenantId,
+      `rev_${projectData.meta.activeRevisionNumber}`,
+      targetEnv,
+      userId,
+      projectData.ir
+    );
+
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'DEPLOY_STUDIO_APP', projectId: req.params.id, deploymentId: deployment.id });
+    res.json({ success: true, deployment });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Studio Cloud deployment failed.' });
+  }
+});
+
+// 17. Phase 3 — List Deployments
+router.get('/api/studio/projects/:id/deployments', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const { listStudioDeployments } = await import('../src/lib/studio/studioPhase3Engine');
+    const deployments = listStudioDeployments(req.params.id);
+
+    res.json({ success: true, deployments });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list deployments.' });
+  }
+});
+
+// 18. Phase 3 — Automated Rollback
+router.post('/api/studio/projects/:id/rollback', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { isKillSwitchActive } = await import('../src/lib/killSwitch');
+    if (await isKillSwitchActive('deployments')) {
+      return res.status(503).json({ error: 'GLOBAL_KILLSWITCH_ACTIVE: Studio Phase 3 operations suspended.' });
+    }
+
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const userId = req.user!.id;
+
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const { targetDeploymentId } = req.body;
+    if (!targetDeploymentId) {
+      return res.status(400).json({ error: 'Field "targetDeploymentId" string is required.' });
+    }
+
+    const { rollbackStudioDeployment } = await import('../src/lib/studio/studioPhase3Engine');
+    const rollbackResult = await rollbackStudioDeployment(req.params.id, tenantId, targetDeploymentId, userId);
+
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'ROLLBACK_STUDIO_APP', projectId: req.params.id, targetDeploymentId });
+    res.json({ success: true, ...rollbackResult });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Deployment rollback failed.' });
+  }
+});
+
+// 19. Phase 3 — Domain Publishing
+router.post('/api/studio/projects/:id/domains', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { isKillSwitchActive } = await import('../src/lib/killSwitch');
+    if (await isKillSwitchActive('deployments')) {
+      return res.status(503).json({ error: 'GLOBAL_KILLSWITCH_ACTIVE: Studio Phase 3 operations suspended.' });
+    }
+
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const { deploymentId, domainName } = req.body;
+    if (!deploymentId || !domainName) {
+      return res.status(400).json({ error: 'Fields "deploymentId" and "domainName" strings are required.' });
+    }
+
+    const { publishStudioAppDomain } = await import('../src/lib/studio/studioPhase3Engine');
+    const publishedDomain = await publishStudioAppDomain(req.params.id, tenantId, deploymentId, domainName);
+
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'PUBLISH_STUDIO_DOMAIN', projectId: req.params.id, domainName });
+    res.json({ success: true, domain: publishedDomain });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Domain publishing failed.' });
+  }
+});
+
+// 20. Phase 3 — Live Observability
+router.get('/api/studio/deployments/:id/observability', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { isKillSwitchActive } = await import('../src/lib/killSwitch');
+    if (await isKillSwitchActive('deployments')) {
+      return res.status(503).json({ error: 'GLOBAL_KILLSWITCH_ACTIVE: Studio Phase 3 operations suspended.' });
+    }
+
+    const { getStudioDeploymentObservability } = await import('../src/lib/studio/studioPhase3Engine');
+    const metrics = getStudioDeploymentObservability(req.params.id);
+
+    res.json({ success: true, metrics });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to load observability metrics.' });
+  }
+});
+
 export default router;

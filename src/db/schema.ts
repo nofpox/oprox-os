@@ -1498,3 +1498,66 @@ export const oproxStudioSyncProvenanceTable = pgTable(
 );
 
 export type OproxStudioSyncProvenanceRow = typeof oproxStudioSyncProvenanceTable.$inferSelect;
+
+export const oproxStudioDeploymentsTable = pgTable(
+  "oprox_studio_deployments",
+  {
+    id: text("id").primaryKey(), // dep_xxx
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull().references(() => oproxStudioProjectsTable.id, { onDelete: "cascade" }),
+    revisionId: text("revision_id").notNull(),
+    environment: text("environment").notNull().default("staging"), // staging | production
+    status: text("status").notNull().default("BUILDING"), // BUILDING | SUCCESS | FAILED | ROLLED_BACK
+    publicUrl: text("public_url").notNull(),
+    buildLogsJson: jsonb("build_logs_json").notNull().default([]),
+    deployedBy: text("deployed_by").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("studio_dep_tenant_idx").on(t.tenantId),
+    index("studio_dep_proj_idx").on(t.projectId),
+  ]
+);
+
+export type OproxStudioDeploymentRow = typeof oproxStudioDeploymentsTable.$inferSelect;
+
+export const oproxStudioPublishedDomainsTable = pgTable(
+  "oprox_studio_published_domains",
+  {
+    id: text("id").primaryKey(), // dom_xxx
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull().references(() => oproxStudioProjectsTable.id, { onDelete: "cascade" }),
+    deploymentId: text("deployment_id").notNull().references(() => oproxStudioDeploymentsTable.id, { onDelete: "cascade" }),
+    domainName: text("domain_name").notNull(),
+    sslActive: boolean("ssl_active").notNull().default(true),
+    dnsStatus: text("dns_status").notNull().default("ACTIVE"), // ACTIVE | PENDING
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("studio_dom_tenant_idx").on(t.tenantId),
+    index("studio_dom_proj_idx").on(t.projectId),
+    uniqueIndex("studio_dom_name_uniq").on(t.domainName),
+  ]
+);
+
+export type OproxStudioPublishedDomainRow = typeof oproxStudioPublishedDomainsTable.$inferSelect;
+
+export const oproxStudioExportManifestsTable = pgTable(
+  "oprox_studio_export_manifests",
+  {
+    id: text("id").primaryKey(), // exp_xxx
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull().references(() => oproxStudioProjectsTable.id, { onDelete: "cascade" }),
+    exportedFilesJson: jsonb("exported_files_json").notNull().default([]),
+    checksumHash: text("checksum_hash").notNull(),
+    exportedBy: text("exported_by").notNull(),
+    exportedAt: timestamp("exported_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("studio_exp_tenant_idx").on(t.tenantId),
+    index("studio_exp_proj_idx").on(t.projectId),
+  ]
+);
+
+export type OproxStudioExportManifestRow = typeof oproxStudioExportManifestsTable.$inferSelect;

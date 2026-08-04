@@ -1679,3 +1679,198 @@ export const oproxStudioPromotionTracesTable = pgTable(
 );
 
 export type OproxStudioPromotionTraceRow = typeof oproxStudioPromotionTracesTable.$inferSelect;
+
+// ── OPROX Real Estate Phase 1 Tables ───────────────────────────────────────
+
+export const realEstatePortfoliosTable = pgTable(
+  "re_portfolios",
+  {
+    id: text("id").primaryKey(), // fol_xxx
+    tenantId: text("tenant_id").notNull(),
+    name: text("name").notNull(),
+    code: text("code"),
+    description: text("description"),
+    status: text("status").notNull().default("active"), // "active" | "archived"
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_portfolios_tenant_idx").on(t.tenantId),
+    index("re_portfolios_status_idx").on(t.status),
+  ]
+);
+
+export type RealEstatePortfolioRow = typeof realEstatePortfoliosTable.$inferSelect;
+
+export const realEstatePropertiesTable = pgTable(
+  "re_properties",
+  {
+    id: text("id").primaryKey(), // prop_xxx
+    tenantId: text("tenant_id").notNull(),
+    portfolioId: text("portfolio_id").references(() => realEstatePortfoliosTable.id, { onDelete: "set null" }),
+    name: text("name").notNull(),
+    type: text("type").notNull(), // standalone_villa | land_plot | apartment_building | residential_compound | commercial_tower | office | retail | warehouse | furnished_apartment | mixed_use | industrial_logistics
+    status: text("status").notNull().default("DRAFT"), // DRAFT | ACTIVE | AVAILABLE | RESERVED | LEASED | SOLD | INACTIVE | ARCHIVED
+    description: text("description"),
+    // Saudi Address fields
+    addressRegion: text("address_region"),
+    addressCity: text("address_city"),
+    addressDistrict: text("address_district"),
+    addressStreet: text("address_street"),
+    postalCode: text("postal_code"),
+    buildingNumber: text("building_number"),
+    additionalNumber: text("additional_number"),
+    latitude: numeric("latitude"),
+    longitude: numeric("longitude"),
+    // Property Specs
+    totalAreaSqm: numeric("total_area_sqm"),
+    builtUpAreaSqm: numeric("built_up_area_sqm"),
+    yearBuilt: integer("year_built"),
+    totalUnitsCount: integer("total_units_count").notNull().default(0),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_props_tenant_idx").on(t.tenantId),
+    index("re_props_portfolio_idx").on(t.portfolioId),
+    index("re_props_type_idx").on(t.type),
+    index("re_props_status_idx").on(t.status),
+    index("re_props_city_idx").on(t.addressCity),
+  ]
+);
+
+export type RealEstatePropertyRow = typeof realEstatePropertiesTable.$inferSelect;
+
+export const realEstateBuildingsTable = pgTable(
+  "re_buildings",
+  {
+    id: text("id").primaryKey(), // bldg_xxx
+    tenantId: text("tenant_id").notNull(),
+    propertyId: text("property_id").notNull().references(() => realEstatePropertiesTable.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    code: text("code"),
+    totalFloors: integer("total_floors").notNull().default(1),
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_bldgs_tenant_idx").on(t.tenantId),
+    index("re_bldgs_prop_idx").on(t.propertyId),
+  ]
+);
+
+export type RealEstateBuildingRow = typeof realEstateBuildingsTable.$inferSelect;
+
+export const realEstateFloorsTable = pgTable(
+  "re_floors",
+  {
+    id: text("id").primaryKey(), // flr_xxx
+    tenantId: text("tenant_id").notNull(),
+    buildingId: text("building_id").notNull().references(() => realEstateBuildingsTable.id, { onDelete: "cascade" }),
+    floorNumber: integer("floor_number").notNull(),
+    name: text("name").notNull(),
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_floors_tenant_idx").on(t.tenantId),
+    index("re_floors_bldg_idx").on(t.buildingId),
+  ]
+);
+
+export type RealEstateFloorRow = typeof realEstateFloorsTable.$inferSelect;
+
+export const realEstateUnitsTable = pgTable(
+  "re_units",
+  {
+    id: text("id").primaryKey(), // unit_xxx
+    tenantId: text("tenant_id").notNull(),
+    propertyId: text("property_id").notNull().references(() => realEstatePropertiesTable.id, { onDelete: "cascade" }),
+    buildingId: text("building_id").references(() => realEstateBuildingsTable.id, { onDelete: "set null" }),
+    floorId: text("floor_id").references(() => realEstateFloorsTable.id, { onDelete: "set null" }),
+    unitNumber: text("unit_number").notNull(),
+    unitType: text("unit_type").notNull().default("apartment"), // apartment | villa | office | retail | warehouse | land_parcel
+    status: text("status").notNull().default("AVAILABLE"), // AVAILABLE | RESERVED | LEASED | SOLD | UNDER_MAINTENANCE | INACTIVE
+    areaSqm: numeric("area_sqm"),
+    bedrooms: integer("bedrooms"),
+    bathrooms: integer("bathrooms"),
+    rentPriceSar: numeric("rent_price_sar"),
+    salePriceSar: numeric("sale_price_sar"),
+    description: text("description"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_units_tenant_idx").on(t.tenantId),
+    index("re_units_prop_idx").on(t.propertyId),
+    index("re_units_bldg_idx").on(t.buildingId),
+    index("re_units_floor_idx").on(t.floorId),
+    index("re_units_status_idx").on(t.status),
+  ]
+);
+
+export type RealEstateUnitRow = typeof realEstateUnitsTable.$inferSelect;
+
+export const realEstateOwnersTable = pgTable(
+  "re_owners",
+  {
+    id: text("id").primaryKey(), // own_xxx
+    tenantId: text("tenant_id").notNull(),
+    fullName: text("full_name").notNull(),
+    ownerType: text("owner_type").notNull().default("INDIVIDUAL"), // INDIVIDUAL | CORPORATE | GOVERNMENT
+    nationalIdOrCr: text("national_id_or_cr"),
+    email: text("email"),
+    phone: text("phone"),
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_owners_tenant_idx").on(t.tenantId),
+    index("re_owners_status_idx").on(t.status),
+  ]
+);
+
+export type RealEstateOwnerRow = typeof realEstateOwnersTable.$inferSelect;
+
+export const realEstatePropertyOwnersTable = pgTable(
+  "re_property_owners",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: text("tenant_id").notNull(),
+    propertyId: text("property_id").notNull().references(() => realEstatePropertiesTable.id, { onDelete: "cascade" }),
+    ownerId: text("owner_id").notNull().references(() => realEstateOwnersTable.id, { onDelete: "cascade" }),
+    ownershipPercentage: numeric("ownership_percentage").notNull().default("100"),
+    isPrimaryOwner: boolean("is_primary_owner").notNull().default(true),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_prop_owners_tenant_idx").on(t.tenantId),
+    index("re_prop_owners_prop_idx").on(t.propertyId),
+    index("re_prop_owners_owner_idx").on(t.ownerId),
+  ]
+);
+
+export type RealEstatePropertyOwnerRow = typeof realEstatePropertyOwnersTable.$inferSelect;
+
+export const realEstateAmenitiesTable = pgTable(
+  "re_amenities",
+  {
+    id: text("id").primaryKey(), // amen_xxx
+    tenantId: text("tenant_id").notNull(),
+    propertyId: text("property_id").notNull().references(() => realEstatePropertiesTable.id, { onDelete: "cascade" }),
+    amenityName: text("amenity_name").notNull(),
+    amenityCategory: text("amenity_category").default("general"), // general | security | leisure | parking
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_amenities_tenant_idx").on(t.tenantId),
+    index("re_amenities_prop_idx").on(t.propertyId),
+  ]
+);
+
+export type RealEstateAmenityRow = typeof realEstateAmenitiesTable.$inferSelect;

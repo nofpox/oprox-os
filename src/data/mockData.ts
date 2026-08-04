@@ -230,12 +230,7 @@ export const TECH_DEBT_ITEMS: TechDebtItem[] = [
   }
 ];
 
-export const PROPERTY_ITEMS: PropertyItem[] = [
-  { id: 'p1', name: 'Nexus Innovation Tower', type: 'Commercial', address: '100 Silicon Way, Tech City', units: 48, occupancyRate: 96.5, monthlyRevenue: 142000, aiMaintenanceScore: 98, status: 'Optimal' },
-  { id: 'p2', name: 'Aura Heights Residences', type: 'Residential', address: '450 Sunset Blvd, Grand Park', units: 120, occupancyRate: 98.2, monthlyRevenue: 285000, aiMaintenanceScore: 94, status: 'Optimal' },
-  { id: 'p3', name: 'Vanguard Logistics Hub', type: 'Industrial', address: '800 Cargo Way, Harbor East', units: 16, occupancyRate: 100.0, monthlyRevenue: 98000, aiMaintenanceScore: 99, status: 'Optimal' },
-  { id: 'p4', name: 'Verdant Mixed-Use Plaza', type: 'Mixed-Use', address: '12 Metro Square, Central', units: 32, occupancyRate: 88.0, monthlyRevenue: 115000, aiMaintenanceScore: 82, status: 'Attention' },
-];
+export const PROPERTY_ITEMS: PropertyItem[] = [];
 
 export const MEDIA_ASSETS: MediaAsset[] = [
   { id: 'm1', title: 'OPROX Autonomous Developer Keynote', type: 'Video Script', concept: 'Futuristic product reveal highlighting multi-agent code orchestration.', description: 'Opening scene: Neon dark canvas with floating terminal code buffers. Narrator explains 18-stage pipeline.', tags: ['Product Launch', 'AI', '4K Script'], dateCreated: '2026-07-28' },

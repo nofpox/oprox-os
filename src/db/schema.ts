@@ -1262,3 +1262,171 @@ export const phase6OperationLocksTable = pgTable(
 );
 
 export type Phase6OperationLockRow = typeof phase6OperationLocksTable.$inferSelect;
+
+// ── OPROX Studio Phase 1: Visual Builder & Low-Code Engine Tables ───────────
+
+export const oproxStudioProjectsTable = pgTable(
+  "oprox_studio_projects",
+  {
+    id: text("id").primaryKey(), // proj_xxx
+    tenantId: text("tenant_id").notNull(),
+    orgId: text("org_id").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    framework: text("framework").notNull().default("react_tailwind"),
+    theme: text("theme").notNull().default("dark_modern"),
+    defaultPageId: text("default_page_id").notNull().default("page_main"),
+    activeRevisionNumber: integer("active_revision_number").notNull().default(1),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("studio_proj_tenant_idx").on(t.tenantId),
+    index("studio_proj_org_idx").on(t.orgId),
+  ]
+);
+
+export type OproxStudioProjectRow = typeof oproxStudioProjectsTable.$inferSelect;
+
+export const oproxStudioCanvasesTable = pgTable(
+  "oprox_studio_canvases",
+  {
+    id: text("id").primaryKey(), // canvas_xxx
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull().references(() => oproxStudioProjectsTable.id, { onDelete: "cascade" }),
+    pageId: text("page_id").notNull(),
+    pageName: text("page_name").notNull(),
+    pagePath: text("page_path").notNull(),
+    ir: jsonb("ir").notNull().default({}),
+    revisionNumber: integer("revision_number").notNull().default(1),
+    updatedBy: text("updated_by").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("studio_canvas_tenant_idx").on(t.tenantId),
+    index("studio_canvas_proj_idx").on(t.projectId),
+    uniqueIndex("studio_canvas_proj_page_uniq").on(t.projectId, t.pageId),
+  ]
+);
+
+export type OproxStudioCanvasRow = typeof oproxStudioCanvasesTable.$inferSelect;
+
+export const oproxStudioDesignTokensTable = pgTable(
+  "oprox_studio_design_tokens",
+  {
+    id: text("id").primaryKey(), // dt_xxx
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull().references(() => oproxStudioProjectsTable.id, { onDelete: "cascade" }),
+    tokens: jsonb("tokens").notNull().default({}),
+    updatedBy: text("updated_by").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("studio_tokens_tenant_idx").on(t.tenantId),
+    uniqueIndex("studio_tokens_proj_uniq").on(t.projectId),
+  ]
+);
+
+export type OproxStudioDesignTokenRow = typeof oproxStudioDesignTokensTable.$inferSelect;
+
+export const oproxStudioComponentsTable = pgTable(
+  "oprox_studio_components",
+  {
+    id: text("id").primaryKey(), // comp_xxx
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull().references(() => oproxStudioProjectsTable.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    category: text("category").notNull().default("CUSTOM"),
+    irNode: jsonb("ir_node").notNull().default({}),
+    isGlobal: boolean("is_global").notNull().default(false),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("studio_comp_tenant_idx").on(t.tenantId),
+    index("studio_comp_proj_idx").on(t.projectId),
+  ]
+);
+
+export type OproxStudioComponentRow = typeof oproxStudioComponentsTable.$inferSelect;
+
+export const oproxStudioSchemasTable = pgTable(
+  "oprox_studio_schemas",
+  {
+    id: text("id").primaryKey(), // schema_xxx
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull().references(() => oproxStudioProjectsTable.id, { onDelete: "cascade" }),
+    schemaModel: jsonb("schema_model").notNull().default({ tables: [] }),
+    generatedDrizzleCode: text("generated_drizzle_code"),
+    updatedBy: text("updated_by").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("studio_schema_tenant_idx").on(t.tenantId),
+    uniqueIndex("studio_schema_proj_uniq").on(t.projectId),
+  ]
+);
+
+export type OproxStudioSchemaRow = typeof oproxStudioSchemasTable.$inferSelect;
+
+export const oproxStudioFlowsTable = pgTable(
+  "oprox_studio_flows",
+  {
+    id: text("id").primaryKey(), // flow_xxx
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull().references(() => oproxStudioProjectsTable.id, { onDelete: "cascade" }),
+    flowGraph: jsonb("flow_graph").notNull().default({ nodes: [], edges: [] }),
+    updatedBy: text("updated_by").notNull(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("studio_flow_tenant_idx").on(t.tenantId),
+    uniqueIndex("studio_flow_proj_uniq").on(t.projectId),
+  ]
+);
+
+export type OproxStudioFlowRow = typeof oproxStudioFlowsTable.$inferSelect;
+
+export const oproxStudioRevisionsTable = pgTable(
+  "oprox_studio_revisions",
+  {
+    id: text("id").primaryKey(), // rev_xxx
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull().references(() => oproxStudioProjectsTable.id, { onDelete: "cascade" }),
+    revisionNumber: integer("revision_number").notNull(),
+    authorId: text("author_id").notNull(),
+    irSnapshot: jsonb("ir_snapshot").notNull().default({}),
+    changeSummary: text("change_summary").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("studio_rev_tenant_idx").on(t.tenantId),
+    index("studio_rev_proj_idx").on(t.projectId),
+    uniqueIndex("studio_rev_proj_num_uniq").on(t.projectId, t.revisionNumber),
+  ]
+);
+
+export type OproxStudioRevisionRow = typeof oproxStudioRevisionsTable.$inferSelect;
+
+export const oproxStudioPromotionsTable = pgTable(
+  "oprox_studio_promotions",
+  {
+    id: text("id").primaryKey(), // promo_xxx
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull().references(() => oproxStudioProjectsTable.id, { onDelete: "cascade" }),
+    revisionNumber: integer("revision_number").notNull(),
+    targetBranch: text("target_branch").notNull().default("feature/studio-build"),
+    changeRequestId: text("change_request_id"),
+    commitSha: text("commit_sha"),
+    status: text("status").notNull().default("PROMOTED"), // PROMOTED | PENDING_APPROVAL | FAILED
+    promotedBy: text("promoted_by").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("studio_promo_tenant_idx").on(t.tenantId),
+    index("studio_promo_proj_idx").on(t.projectId),
+  ]
+);
+
+export type OproxStudioPromotionRow = typeof oproxStudioPromotionsTable.$inferSelect;

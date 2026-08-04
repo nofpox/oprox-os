@@ -12,6 +12,7 @@ import phase3Routes from './server/phase3Routes';
 import phase4Routes from './server/phase4Routes';
 import phase5Routes from './server/phase5Routes';
 import phase6Routes from './server/phase6Routes';
+import studioRoutes from './server/studioRoutes';
 import { aiGovernanceGate } from './server/aiGovernance';
 import { logSecurityAudit } from './server/audit';
 import { AuthRequest, requireAuth } from './server/auth';
@@ -161,6 +162,7 @@ app.use(phase3Routes);
 app.use(phase4Routes);
 app.use(phase5Routes);
 app.use(phase6Routes);
+app.use(studioRoutes);
 
 // Phase 4: Billing, Subscriptions & Invoicing API Routes
 app.post('/api/billing/subscriptions', requireAuth, async (req: AuthRequest, res) => {

@@ -4,6 +4,7 @@ import { ShowcaseView } from './components/showcase/ShowcaseView';
 import { OproxCodeIDE } from './components/ide/OproxCodeIDE';
 import { AiOperatingSystem } from './components/ai/AiOperatingSystem';
 import { OproxCodeAiSuite } from './components/ai/OproxCodeAiSuite';
+import { StudioAppSuite } from './components/studio/StudioAppSuite';
 import { DatabaseStudio } from './components/database/DatabaseStudio';
 import { CloudMonitors } from './components/cloud/CloudMonitors';
 import { EnterpriseOS } from './components/memory/EnterpriseOS';
@@ -91,6 +92,10 @@ export default function App() {
               theme={theme}
               activeProjectTitle={activeProjectTitle}
             />
+          )}
+
+          {currentMode === 'studio' && (
+            <StudioAppSuite />
           )}
 
           {currentMode === 'solutions' && (

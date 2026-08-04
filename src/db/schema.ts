@@ -2164,3 +2164,386 @@ export const realEstateLeaseDocumentsTable = pgTable(
 );
 
 export type RealEstateLeaseDocumentRow = typeof realEstateLeaseDocumentsTable.$inferSelect;
+
+// ── OPROX REAL ESTATE PHASE 3 TABLES ──────────────────────────────────────
+
+export const realEstateLeadsTable = pgTable(
+  "re_leads",
+  {
+    id: text("id").primaryKey(), // lead_xxx
+    tenantId: text("tenant_id").notNull(),
+    contactId: text("contact_id").references(() => realEstateContactsTable.id, { onDelete: "set null" }),
+    leadNumber: text("lead_number").notNull(), // LEAD-2026-00001
+    title: text("title").notNull(),
+    source: text("source").notNull().default("WEBSITE"), // WEBSITE | PORTAL | DIRECT | REFERRAL | AGENT | PHONE | SOCIAL
+    status: text("status").notNull().default("NEW"), // NEW | QUALIFIED | PROPERTY_MATCHED | VIEWING_SCHEDULED | OFFER_MADE | NEGOTIATING | RESERVED | HANDOVER | WON | LOST
+    priority: text("priority").notNull().default("MEDIUM"), // LOW | MEDIUM | HIGH | URGENT
+    budgetSar: numeric("budget_sar"),
+    preferredPropertyType: text("preferred_property_type"),
+    preferredCity: text("preferred_city"),
+    preferredDistrict: text("preferred_district"),
+    notes: text("notes"),
+    assignedAgentId: text("assigned_agent_id"),
+    lostReason: text("lost_reason"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_leads_tenant_idx").on(t.tenantId),
+    index("re_leads_contact_idx").on(t.contactId),
+    index("re_leads_status_idx").on(t.status),
+    index("re_leads_source_idx").on(t.source),
+  ]
+);
+
+export type RealEstateLeadRow = typeof realEstateLeadsTable.$inferSelect;
+
+export const realEstateLeadActivitiesTable = pgTable(
+  "re_lead_activities",
+  {
+    id: text("id").primaryKey(), // act_xxx
+    tenantId: text("tenant_id").notNull(),
+    leadId: text("lead_id").notNull().references(() => realEstateLeadsTable.id, { onDelete: "cascade" }),
+    activityType: text("activity_type").notNull(), // INQUIRY | NOTE | CALL | EMAIL | MEETING | STAGE_CHANGE | VIEWING_RECORDED | OFFER_RECORDED
+    summary: text("summary").notNull(),
+    details: text("details"),
+    actorId: text("actor_id").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_lead_act_tenant_idx").on(t.tenantId),
+    index("re_lead_act_lead_idx").on(t.leadId),
+    index("re_lead_act_type_idx").on(t.activityType),
+  ]
+);
+
+export type RealEstateLeadActivityRow = typeof realEstateLeadActivitiesTable.$inferSelect;
+
+export const realEstateLeadPropertyMatchesTable = pgTable(
+  "re_lead_property",
+  {
+    id: text("id").primaryKey(), // lpm_xxx
+    tenantId: text("tenant_id").notNull(),
+    leadId: text("lead_id").notNull().references(() => realEstateLeadsTable.id, { onDelete: "cascade" }),
+    propertyId: text("property_id").references(() => realEstatePropertiesTable.id, { onDelete: "cascade" }),
+    unitId: text("unit_id").references(() => realEstateUnitsTable.id, { onDelete: "cascade" }),
+    matchScore: integer("match_score").default(100),
+    status: text("status").notNull().default("SHORTLISTED"), // SHORTLISTED | VIEWED | OFFERED | RESERVED | REJECTED
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_lead_prop_tenant_idx").on(t.tenantId),
+    index("re_lead_prop_lead_idx").on(t.leadId),
+    index("re_lead_prop_unit_idx").on(t.unitId),
+  ]
+);
+
+export type RealEstateLeadPropertyMatchRow = typeof realEstateLeadPropertyMatchesTable.$inferSelect;
+
+export const realEstateViewingsTable = pgTable(
+  "re_viewings",
+  {
+    id: text("id").primaryKey(), // vw_xxx
+    tenantId: text("tenant_id").notNull(),
+    leadId: text("lead_id").notNull().references(() => realEstateLeadsTable.id, { onDelete: "cascade" }),
+    propertyId: text("property_id").references(() => realEstatePropertiesTable.id, { onDelete: "cascade" }),
+    unitId: text("unit_id").references(() => realEstateUnitsTable.id, { onDelete: "cascade" }),
+    scheduledAt: timestamp("scheduled_at").notNull(),
+    completedAt: timestamp("completed_at"),
+    status: text("status").notNull().default("SCHEDULED"), // SCHEDULED | COMPLETED | CANCELLED | NO_SHOW
+    feedback: text("feedback"),
+    agentRating: integer("agent_rating"),
+    clientInterestLevel: text("client_interest_level"), // HIGH | MEDIUM | LOW
+    assignedAgentId: text("assigned_agent_id").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_viewings_tenant_idx").on(t.tenantId),
+    index("re_viewings_lead_idx").on(t.leadId),
+    index("re_viewings_status_idx").on(t.status),
+  ]
+);
+
+export type RealEstateViewingRow = typeof realEstateViewingsTable.$inferSelect;
+
+export const realEstateOffersTable = pgTable(
+  "re_offers",
+  {
+    id: text("id").primaryKey(), // ofr_xxx
+    tenantId: text("tenant_id").notNull(),
+    leadId: text("lead_id").notNull().references(() => realEstateLeadsTable.id, { onDelete: "cascade" }),
+    propertyId: text("property_id").references(() => realEstatePropertiesTable.id, { onDelete: "cascade" }),
+    unitId: text("unit_id").references(() => realEstateUnitsTable.id, { onDelete: "cascade" }),
+    offerNumber: text("offer_number").notNull(), // OFR-2026-00001
+    offeredAmountSar: numeric("offered_amount_sar").notNull(),
+    depositAmountSar: numeric("deposit_amount_sar").default("0"),
+    paymentFrequency: text("payment_frequency").default("ANNUAL"), // MONTHLY | QUARTERLY | SEMI_ANNUAL | ANNUAL | CUSTOM
+    proposedStartDate: text("proposed_start_date"),
+    proposedEndDate: text("proposed_end_date"),
+    status: text("status").notNull().default("DRAFT"), // DRAFT | SUBMITTED | COUNTERED | ACCEPTED | REJECTED | EXPIRED | WITHDRAWN
+    counterAmountSar: numeric("counter_amount_sar"),
+    specialTerms: text("special_terms"),
+    validUntil: timestamp("valid_until"),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_offers_tenant_idx").on(t.tenantId),
+    index("re_offers_lead_idx").on(t.leadId),
+    index("re_offers_status_idx").on(t.status),
+  ]
+);
+
+export type RealEstateOfferRow = typeof realEstateOffersTable.$inferSelect;
+
+export const realEstateReservationsTable = pgTable(
+  "re_reservations",
+  {
+    id: text("id").primaryKey(), // res_xxx
+    tenantId: text("tenant_id").notNull(),
+    leadId: text("lead_id").references(() => realEstateLeadsTable.id, { onDelete: "set null" }),
+    offerId: text("offer_id").references(() => realEstateOffersTable.id, { onDelete: "set null" }),
+    propertyId: text("property_id").references(() => realEstatePropertiesTable.id, { onDelete: "cascade" }),
+    unitId: text("unit_id").notNull().references(() => realEstateUnitsTable.id, { onDelete: "cascade" }),
+    reTenantId: text("re_tenant_id").references(() => realEstateTenantsTable.id, { onDelete: "set null" }),
+    reservationNumber: text("reservation_number").notNull(), // RES-2026-00001
+    reservationFeeSar: numeric("reservation_fee_sar").notNull(),
+    status: text("status").notNull().default("ACTIVE"), // ACTIVE | CONVERTED_TO_LEASE | EXPIRED | CANCELLED | FORFEITED
+    reservedUntil: timestamp("reserved_until").notNull(),
+    convertedLeaseId: text("converted_lease_id").references(() => realEstateLeasesTable.id, { onDelete: "set null" }),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_reservations_tenant_idx").on(t.tenantId),
+    index("re_reservations_unit_idx").on(t.unitId),
+    index("re_reservations_status_idx").on(t.status),
+  ]
+);
+
+export type RealEstateReservationRow = typeof realEstateReservationsTable.$inferSelect;
+
+// ── OPROX REAL ESTATE PHASE 4 TABLES (PROPTECH MARKETPLACE) ───────────────
+
+export const realEstateDevelopersTable = pgTable(
+  "re_developers",
+  {
+    id: text("id").primaryKey(), // dev_xxx
+    tenantId: text("tenant_id").notNull(),
+    name: text("name").notNull(),
+    slug: text("slug").notNull().unique(),
+    logoUrl: text("logo_url"),
+    coverImageUrl: text("cover_image_url"),
+    description: text("description"),
+    website: text("website"),
+    contactEmail: text("contact_email"),
+    contactPhone: text("contact_phone"),
+    establishedYear: integer("established_year"),
+    headquartersCity: text("headquarters_city"),
+    verified: boolean("verified").notNull().default(false),
+    rating: real("rating").default(4.8),
+    totalProjects: integer("total_projects").default(0),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_devs_tenant_idx").on(t.tenantId),
+    index("re_devs_slug_idx").on(t.slug),
+    index("re_devs_verified_idx").on(t.verified),
+  ]
+);
+
+export type RealEstateDeveloperRow = typeof realEstateDevelopersTable.$inferSelect;
+
+export const realEstateProjectsTable = pgTable(
+  "re_projects",
+  {
+    id: text("id").primaryKey(), // prj_xxx
+    tenantId: text("tenant_id").notNull(),
+    developerId: text("developer_id").references(() => realEstateDevelopersTable.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    slug: text("slug").notNull().unique(),
+    description: text("description"),
+    city: text("city").notNull(),
+    district: text("district").notNull(),
+    latitude: real("latitude"),
+    longitude: real("longitude"),
+    masterPlanUrl: text("master_plan_url"),
+    coverImageUrl: text("cover_image_url"),
+    galleryUrls: jsonb("gallery_urls").default([]),
+    completionStatus: text("completion_status").notNull().default("UNDER_CONSTRUCTION"), // OFF_PLAN | UNDER_CONSTRUCTION | COMPLETED | READY
+    completionYear: integer("completion_year"),
+    startingPriceSar: numeric("starting_price_sar"),
+    totalUnits: integer("total_units").default(0),
+    availableUnits: integer("available_units").default(0),
+    amenities: jsonb("amenities").default([]),
+    constructionProgressPct: integer("construction_progress_pct").default(0),
+    featured: boolean("featured").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_projects_tenant_idx").on(t.tenantId),
+    index("re_projects_dev_idx").on(t.developerId),
+    index("re_projects_slug_idx").on(t.slug),
+    index("re_projects_city_idx").on(t.city),
+    index("re_projects_status_idx").on(t.completionStatus),
+    index("re_projects_featured_idx").on(t.featured),
+  ]
+);
+
+export type RealEstateProjectRow = typeof realEstateProjectsTable.$inferSelect;
+
+export const realEstatePublicListingsTable = pgTable(
+  "re_public_listings",
+  {
+    id: text("id").primaryKey(), // lst_xxx
+    tenantId: text("tenant_id").notNull(),
+    propertyId: text("property_id").references(() => realEstatePropertiesTable.id, { onDelete: "set null" }),
+    projectId: text("project_id").references(() => realEstateProjectsTable.id, { onDelete: "set null" }),
+    developerId: text("developer_id").references(() => realEstateDevelopersTable.id, { onDelete: "set null" }),
+    listingNumber: text("listing_number").notNull(), // LST-2026-00001
+    title: text("title").notNull(),
+    slug: text("slug").notNull().unique(),
+    listingType: text("listing_type").notNull(), // SALE | RENT | SHORT_TERM
+    category: text("category").notNull().default("RESIDENTIAL"), // RESIDENTIAL | COMMERCIAL | LAND | INDUSTRIAL | LUXURY
+    propertyType: text("property_type").notNull(), // APARTMENT | VILLA | DUPLEX | PENTHOUSE | OFFICE | RETAIL | LAND | WAREHOUSE
+    priceSar: numeric("price_sar").notNull(),
+    rentFrequency: text("rent_frequency"), // ANNUAL | MONTHLY | WEEKLY | DAILY
+    city: text("city").notNull(),
+    district: text("district").notNull(),
+    address: text("address"),
+    latitude: real("latitude"),
+    longitude: real("longitude"),
+    bedrooms: integer("bedrooms").default(0),
+    bathrooms: integer("bathrooms").default(0),
+    areaSqm: numeric("area_sqm"),
+    furnished: text("furnished").default("UNFURNISHED"), // UNFURNISHED | SEMI_FURNISHED | FULLY_FURNISHED
+    amenities: jsonb("amenities").default([]),
+    coverImageUrl: text("cover_image_url"),
+    galleryUrls: jsonb("gallery_urls").default([]),
+    videoUrl: text("video_url"),
+    floorPlanUrl: text("floor_plan_url"),
+    virtualTour360Url: text("virtual_tour_360_url"),
+    completionStatus: text("completion_status").default("READY"), // READY | OFF_PLAN | UNDER_CONSTRUCTION
+    status: text("status").notNull().default("PUBLISHED"), // DRAFT | PENDING_MODERATION | PUBLISHED | RESERVED | SOLD | RENTED | ARCHIVED
+    featured: boolean("featured").notNull().default(false),
+    viewCount: integer("view_count").default(0),
+    inquiryCount: integer("inquiry_count").default(0),
+    aiGeneratedDescription: text("ai_generated_description"),
+    metaTitle: text("meta_title"),
+    metaDescription: text("meta_description"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_listings_tenant_idx").on(t.tenantId),
+    index("re_listings_slug_idx").on(t.slug),
+    index("re_listings_type_idx").on(t.listingType),
+    index("re_listings_category_idx").on(t.category),
+    index("re_listings_proptype_idx").on(t.propertyType),
+    index("re_listings_city_idx").on(t.city),
+    index("re_listings_status_idx").on(t.status),
+    index("re_listings_featured_idx").on(t.featured),
+    index("re_listings_proj_idx").on(t.projectId),
+  ]
+);
+
+export type RealEstatePublicListingRow = typeof realEstatePublicListingsTable.$inferSelect;
+
+export const realEstateSavedSearchesTable = pgTable(
+  "re_saved_searches",
+  {
+    id: text("id").primaryKey(), // srch_xxx
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull(),
+    title: text("title").notNull(),
+    filtersJson: jsonb("filters_json").notNull(),
+    notifyEmail: boolean("notify_email").default(true),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_saved_srch_tenant_idx").on(t.tenantId),
+    index("re_saved_srch_user_idx").on(t.userId),
+  ]
+);
+
+export type RealEstateSavedSearchRow = typeof realEstateSavedSearchesTable.$inferSelect;
+
+export const realEstateFavoritesTable = pgTable(
+  "re_favorites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull(),
+    listingId: text("listing_id").notNull().references(() => realEstatePublicListingsTable.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("re_favorites_user_listing_uniq").on(t.userId, t.listingId),
+    index("re_favorites_tenant_idx").on(t.tenantId),
+    index("re_favorites_user_idx").on(t.userId),
+  ]
+);
+
+export type RealEstateFavoriteRow = typeof realEstateFavoritesTable.$inferSelect;
+
+export const realEstateInquiriesTable = pgTable(
+  "re_inquiries",
+  {
+    id: text("id").primaryKey(), // inq_xxx
+    tenantId: text("tenant_id").notNull(),
+    listingId: text("listing_id").references(() => realEstatePublicListingsTable.id, { onDelete: "set null" }),
+    projectId: text("project_id").references(() => realEstateProjectsTable.id, { onDelete: "set null" }),
+    developerId: text("developer_id").references(() => realEstateDevelopersTable.id, { onDelete: "set null" }),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    phone: text("phone").notNull(),
+    message: text("message"),
+    inquiryType: text("inquiry_type").default("BUY"), // BUY | RENT | VISIT | GENERAL
+    preferredContactMethod: text("preferred_contact_method").default("PHONE"), // PHONE | EMAIL | WHATSAPP
+    status: text("status").notNull().default("NEW"), // NEW | CONTACTED | QUALIFIED | CLOSED
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_inquiries_tenant_idx").on(t.tenantId),
+    index("re_inquiries_listing_idx").on(t.listingId),
+    index("re_inquiries_project_idx").on(t.projectId),
+    index("re_inquiries_status_idx").on(t.status),
+  ]
+);
+
+export type RealEstateInquiryRow = typeof realEstateInquiriesTable.$inferSelect;
+
+export const realEstateAiValuationsTable = pgTable(
+  "re_ai_valuations",
+  {
+    id: text("id").primaryKey(), // val_xxx
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull(),
+    city: text("city").notNull(),
+    district: text("district").notNull(),
+    propertyType: text("property_type").notNull(),
+    areaSqm: numeric("area_sqm").notNull(),
+    bedrooms: integer("bedrooms"),
+    estimatedPriceMinSar: numeric("estimated_price_min_sar").notNull(),
+    estimatedPriceMaxSar: numeric("estimated_price_max_sar").notNull(),
+    estimatedPriceAvgSar: numeric("estimated_price_avg_sar").notNull(),
+    estimatedPricePerSqmSar: numeric("estimated_price_per_sqm_sar").notNull(),
+    confidenceScorePct: integer("confidence_score_pct").notNull(),
+    comparableCount: integer("comparable_count").notNull(),
+    marketTrend: text("market_trend"), // UPWARD | STABLE | DOWNWARD
+    aiAnalysisSummary: text("ai_analysis_summary"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_ai_val_tenant_idx").on(t.tenantId),
+    index("re_ai_val_user_idx").on(t.userId),
+  ]
+);
+
+export type RealEstateAiValuationRow = typeof realEstateAiValuationsTable.$inferSelect;

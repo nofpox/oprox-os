@@ -66,6 +66,60 @@ import {
   getLeaseFinancialSummary,
   getPhase2DashboardMetrics,
 } from '../src/lib/realestate/realEstatePhase2Store';
+import {
+  createLead,
+  getLead,
+  listLeads,
+  updateLead,
+  transitionLeadStatus,
+  addLeadActivity,
+  listLeadActivities,
+  matchPropertiesForLead,
+  listLeadPropertyMatches,
+  scheduleViewing,
+  getViewing,
+  listViewings,
+  updateViewingStatus,
+  createOffer,
+  getOffer,
+  listOffers,
+  updateOfferStatus,
+  createReservation,
+  getReservation,
+  listReservations,
+  convertReservationToLease,
+  cancelReservation,
+  getPhase3CrmMetrics,
+} from '../src/lib/realestate/realEstatePhase3Store';
+import {
+  createDeveloper,
+  getDeveloper,
+  listDevelopers,
+  updateDeveloper,
+  deleteDeveloper,
+  createProject,
+  getProject,
+  listProjects,
+  updateProject,
+  deleteProject,
+  createListing,
+  getListing,
+  incrementListingViewCount,
+  searchPublicListings,
+  updateListing,
+  deleteListing,
+  aiSearchPublicListings,
+  generateAiValuation,
+  saveUserSearch,
+  listUserSavedSearches,
+  deleteUserSavedSearch,
+  toggleFavoriteProperty,
+  listUserFavorites,
+  createInquiry,
+  listInquiries,
+  updateInquiryStatus,
+  getPhase4MarketplaceMetrics,
+} from '../src/lib/realestate/realEstatePhase4Store';
 
 const router = Router();
 
@@ -902,6 +956,585 @@ router.get('/api/real-estate/phase2-dashboard', requireAuth, async (req: AuthReq
     res.json({ success: true, metrics });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || 'Failed to fetch Phase 2 dashboard metrics.' });
+  }
+});
+
+// ── PHASE 3: CRM, LEADS & PIPELINE ────────────────────────────────────────
+
+router.get('/api/real-estate/leads', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { status, source, priority, search } = req.query;
+    const leads = await listLeads(tenantId, {
+      status: status ? String(status) : undefined,
+      source: source ? String(source) : undefined,
+      priority: priority ? String(priority) : undefined,
+      search: search ? String(search) : undefined,
+    });
+    res.json({ success: true, leads });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list leads.' });
+  }
+});
+
+router.post('/api/real-estate/leads', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const lead = await createLead({ ...req.body, tenantId, assignedAgentId: req.user!.id });
+    res.json({ success: true, lead });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to create lead.' });
+  }
+});
+
+router.get('/api/real-estate/leads/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const lead = await getLead(tenantId, req.params.id);
+    if (!lead) return res.status(404).json({ error: 'Lead not found.' });
+    res.json({ success: true, lead });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch lead.' });
+  }
+});
+
+router.patch('/api/real-estate/leads/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const lead = await updateLead(tenantId, req.params.id, req.body);
+    res.json({ success: true, lead });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to update lead.' });
+  }
+});
+
+router.post('/api/real-estate/leads/:id/transition', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { newStatus, reason } = req.body;
+    if (!newStatus) return res.status(400).json({ error: 'Field "newStatus" is required.' });
+    const lead = await transitionLeadStatus(tenantId, req.params.id, newStatus, req.user!.id, reason);
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'TRANSITION_RE_LEAD_STAGE', leadId: lead.id, newStatus });
+    res.json({ success: true, lead });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to transition lead stage.' });
+  }
+});
+
+router.get('/api/real-estate/leads/:id/activities', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const activities = await listLeadActivities(tenantId, req.params.id);
+    res.json({ success: true, activities });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list lead activities.' });
+  }
+});
+
+router.post('/api/real-estate/leads/:id/activities', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { activityType, summary, details } = req.body;
+    if (!activityType || !summary) return res.status(400).json({ error: 'Fields activityType and summary are required.' });
+    const activity = await addLeadActivity({
+      tenantId,
+      leadId: req.params.id,
+      activityType,
+      summary,
+      details,
+      actorId: req.user!.id,
+    });
+    res.json({ success: true, activity });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to add lead activity.' });
+  }
+});
+
+router.post('/api/real-estate/leads/:id/match-properties', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const matches = await matchPropertiesForLead(tenantId, req.params.id);
+    res.json({ success: true, matches });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to match properties for lead.' });
+  }
+});
+
+router.get('/api/real-estate/leads/:id/property-matches', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const matches = await listLeadPropertyMatches(tenantId, req.params.id);
+    res.json({ success: true, matches });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list lead property matches.' });
+  }
+});
+
+// ── PHASE 3: VIEWINGS ──────────────────────────────────────────────────────
+
+router.get('/api/real-estate/viewings', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { leadId, status, agentId } = req.query;
+    const viewings = await listViewings(tenantId, {
+      leadId: leadId ? String(leadId) : undefined,
+      status: status ? String(status) : undefined,
+      agentId: agentId ? String(agentId) : undefined,
+    });
+    res.json({ success: true, viewings });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list viewings.' });
+  }
+});
+
+router.post('/api/real-estate/viewings', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const viewing = await scheduleViewing({ ...req.body, tenantId, assignedAgentId: req.user!.id });
+    res.json({ success: true, viewing });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to schedule viewing.' });
+  }
+});
+
+router.patch('/api/real-estate/viewings/:id/status', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { status, feedback, agentRating, clientInterestLevel } = req.body;
+    if (!status) return res.status(400).json({ error: 'Field "status" is required.' });
+    const viewing = await updateViewingStatus(
+      tenantId,
+      req.params.id,
+      status,
+      feedback,
+      agentRating ? Number(agentRating) : undefined,
+      clientInterestLevel
+    );
+    res.json({ success: true, viewing });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to update viewing status.' });
+  }
+});
+
+// ── PHASE 3: OFFERS ────────────────────────────────────────────────────────
+
+router.get('/api/real-estate/offers', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { leadId, status } = req.query;
+    const offers = await listOffers(tenantId, {
+      leadId: leadId ? String(leadId) : undefined,
+      status: status ? String(status) : undefined,
+    });
+    res.json({ success: true, offers });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list offers.' });
+  }
+});
+
+router.post('/api/real-estate/offers', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const offer = await createOffer({ ...req.body, tenantId, createdBy: req.user!.id });
+    res.json({ success: true, offer });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to create offer.' });
+  }
+});
+
+router.patch('/api/real-estate/offers/:id/status', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { status, counterAmountSar, specialTerms } = req.body;
+    if (!status) return res.status(400).json({ error: 'Field "status" is required.' });
+    const offer = await updateOfferStatus(tenantId, req.params.id, status, counterAmountSar, specialTerms, req.user!.id);
+    res.json({ success: true, offer });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to update offer status.' });
+  }
+});
+
+// ── PHASE 3: RESERVATIONS & LEASE CONVERSION ─────────────────────────────
+
+router.get('/api/real-estate/reservations', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { status, unitId } = req.query;
+    const reservations = await listReservations(tenantId, {
+      status: status ? String(status) : undefined,
+      unitId: unitId ? String(unitId) : undefined,
+    });
+    res.json({ success: true, reservations });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list reservations.' });
+  }
+});
+
+router.post('/api/real-estate/reservations', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const reservation = await createReservation({ ...req.body, tenantId, createdBy: req.user!.id });
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'CREATE_RE_RESERVATION', reservationId: reservation.id });
+    res.json({ success: true, reservation });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to create reservation.' });
+  }
+});
+
+router.post('/api/real-estate/reservations/:id/convert-to-lease', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const result = await convertReservationToLease(tenantId, req.params.id, req.body, req.user!.id);
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'CONVERT_RE_RESERVATION_TO_LEASE', reservationId: req.params.id, leaseId: result.lease.id });
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to convert reservation to lease.' });
+  }
+});
+
+router.post('/api/real-estate/reservations/:id/cancel', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { reason } = req.body;
+    const reservation = await cancelReservation(tenantId, req.params.id, reason);
+    res.json({ success: true, reservation });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to cancel reservation.' });
+  }
+});
+
+// ── PHASE 3: CRM DASHBOARD METRICS ────────────────────────────────────────
+
+router.get('/api/real-estate/crm-dashboard', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const metrics = await getPhase3CrmMetrics(tenantId);
+    res.json({ success: true, metrics });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch CRM dashboard metrics.' });
+  }
+});
+
+// ── PHASE 4: PUBLIC MARKETPLACE & SMART DISCOVERY ────────────────────────
+
+router.get('/api/real-estate/marketplace/listings', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const {
+      search,
+      city,
+      district,
+      listingType,
+      category,
+      propertyType,
+      minPrice,
+      maxPrice,
+      bedrooms,
+      bathrooms,
+      minArea,
+      maxArea,
+      furnished,
+      completionStatus,
+      developerId,
+      projectId,
+      featured,
+      status,
+    } = req.query;
+
+    const listings = await searchPublicListings(tenantId, {
+      search: search ? String(search) : undefined,
+      city: city ? String(city) : undefined,
+      district: district ? String(district) : undefined,
+      listingType: listingType ? String(listingType) : undefined,
+      category: category ? String(category) : undefined,
+      propertyType: propertyType ? String(propertyType) : undefined,
+      minPrice: minPrice ? Number(minPrice) : undefined,
+      maxPrice: maxPrice ? Number(maxPrice) : undefined,
+      bedrooms: bedrooms ? Number(bedrooms) : undefined,
+      bathrooms: bathrooms ? Number(bathrooms) : undefined,
+      minArea: minArea ? Number(minArea) : undefined,
+      maxArea: maxArea ? Number(maxArea) : undefined,
+      furnished: furnished ? String(furnished) : undefined,
+      completionStatus: completionStatus ? String(completionStatus) : undefined,
+      developerId: developerId ? String(developerId) : undefined,
+      projectId: projectId ? String(projectId) : undefined,
+      featured: featured !== undefined ? featured === 'true' : undefined,
+      status: status ? String(status) : undefined,
+    });
+
+    res.json({ success: true, listings });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch marketplace listings.' });
+  }
+});
+
+router.get('/api/real-estate/marketplace/listings/:idOrSlug', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const listing = await getListing(tenantId, req.params.idOrSlug);
+    if (!listing) return res.status(404).json({ error: 'Listing not found.' });
+
+    await incrementListingViewCount(tenantId, listing.id);
+    res.json({ success: true, listing });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch listing detail.' });
+  }
+});
+
+router.post('/api/real-estate/marketplace/listings', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const listing = await createListing({ ...req.body, tenantId });
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'CREATE_RE_LISTING', listingId: listing.id });
+    res.json({ success: true, listing });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to create marketplace listing.' });
+  }
+});
+
+router.put('/api/real-estate/marketplace/listings/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const listing = await updateListing(tenantId, req.params.id, req.body);
+    if (!listing) return res.status(404).json({ error: 'Listing not found.' });
+    res.json({ success: true, listing });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to update marketplace listing.' });
+  }
+});
+
+router.delete('/api/real-estate/marketplace/listings/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const success = await deleteListing(tenantId, req.params.id);
+    if (!success) return res.status(404).json({ error: 'Listing not found.' });
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'DELETE_RE_LISTING', listingId: req.params.id });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to delete marketplace listing.' });
+  }
+});
+
+router.post('/api/real-estate/marketplace/search/natural-language', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { prompt } = req.body;
+    if (!prompt) return res.status(400).json({ error: 'Field "prompt" is required.' });
+
+    const result = await aiSearchPublicListings(tenantId, prompt);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to execute natural language search.' });
+  }
+});
+
+router.post('/api/real-estate/marketplace/valuation', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { city, district, propertyType, areaSqm, bedrooms } = req.body;
+    if (!city || !district || !propertyType || !areaSqm) {
+      return res.status(400).json({ error: 'Fields "city", "district", "propertyType", and "areaSqm" are required.' });
+    }
+
+    const valuation = await generateAiValuation({
+      tenantId,
+      userId: req.user!.id,
+      city,
+      district,
+      propertyType,
+      areaSqm: Number(areaSqm),
+      bedrooms: bedrooms ? Number(bedrooms) : undefined,
+    });
+
+    res.json({ success: true, valuation });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to generate AI valuation.' });
+  }
+});
+
+// ── SAVED SEARCHES & FAVORITES ─────────────────────────────────────────────
+
+router.get('/api/real-estate/marketplace/saved-searches', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const savedSearches = await listUserSavedSearches(tenantId, req.user!.id);
+    res.json({ success: true, savedSearches });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list saved searches.' });
+  }
+});
+
+router.post('/api/real-estate/marketplace/saved-searches', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { title, filtersJson, notifyEmail } = req.body;
+    if (!title || !filtersJson) {
+      return res.status(400).json({ error: 'Fields "title" and "filtersJson" are required.' });
+    }
+
+    const savedSearch = await saveUserSearch({
+      tenantId,
+      userId: req.user!.id,
+      title,
+      filtersJson,
+      notifyEmail,
+    });
+
+    res.json({ success: true, savedSearch });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to save search.' });
+  }
+});
+
+router.delete('/api/real-estate/marketplace/saved-searches/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const success = await deleteUserSavedSearch(tenantId, req.params.id);
+    if (!success) return res.status(404).json({ error: 'Saved search not found.' });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to delete saved search.' });
+  }
+});
+
+router.get('/api/real-estate/marketplace/favorites', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const favorites = await listUserFavorites(tenantId, req.user!.id);
+    res.json({ success: true, favorites });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch user favorites.' });
+  }
+});
+
+router.post('/api/real-estate/marketplace/favorites/toggle', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { listingId } = req.body;
+    if (!listingId) return res.status(400).json({ error: 'Field "listingId" is required.' });
+
+    const result = await toggleFavoriteProperty(tenantId, req.user!.id, listingId);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to toggle favorite.' });
+  }
+});
+
+// ── DEVELOPERS & PROJECTS ───────────────────────────────────────────────────
+
+router.get('/api/real-estate/developers', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const developers = await listDevelopers(tenantId);
+    res.json({ success: true, developers });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list developers.' });
+  }
+});
+
+router.get('/api/real-estate/developers/:idOrSlug', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const developer = await getDeveloper(tenantId, req.params.idOrSlug);
+    if (!developer) return res.status(404).json({ error: 'Developer profile not found.' });
+    res.json({ success: true, developer });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch developer.' });
+  }
+});
+
+router.post('/api/real-estate/developers', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const developer = await createDeveloper({ ...req.body, tenantId });
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'CREATE_RE_DEVELOPER', developerId: developer.id });
+    res.json({ success: true, developer });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to create developer profile.' });
+  }
+});
+
+router.get('/api/real-estate/projects', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { developerId, city, completionStatus, featured } = req.query;
+    const projects = await listProjects(tenantId, {
+      developerId: developerId ? String(developerId) : undefined,
+      city: city ? String(city) : undefined,
+      completionStatus: completionStatus ? String(completionStatus) : undefined,
+      featured: featured !== undefined ? featured === 'true' : undefined,
+    });
+    res.json({ success: true, projects });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list projects.' });
+  }
+});
+
+router.get('/api/real-estate/projects/:idOrSlug', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const project = await getProject(tenantId, req.params.idOrSlug);
+    if (!project) return res.status(404).json({ error: 'Project showcase not found.' });
+    res.json({ success: true, project });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch project.' });
+  }
+});
+
+router.post('/api/real-estate/projects', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const project = await createProject({ ...req.body, tenantId });
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'CREATE_RE_PROJECT', projectId: project.id });
+    res.json({ success: true, project });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to create project.' });
+  }
+});
+
+// ── INQUIRIES & MARKETPLACE METRICS ─────────────────────────────────────────
+
+router.get('/api/real-estate/marketplace/inquiries', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const inquiries = await listInquiries(tenantId);
+    res.json({ success: true, inquiries });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list marketplace inquiries.' });
+  }
+});
+
+router.post('/api/real-estate/marketplace/inquiries', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const inquiry = await createInquiry({ ...req.body, tenantId });
+    res.json({ success: true, inquiry });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to submit marketplace inquiry.' });
+  }
+});
+
+router.patch('/api/real-estate/marketplace/inquiries/:id/status', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { status } = req.body;
+    if (!status) return res.status(400).json({ error: 'Field "status" is required.' });
+
+    const inquiry = await updateInquiryStatus(tenantId, req.params.id, status);
+    if (!inquiry) return res.status(404).json({ error: 'Inquiry not found.' });
+    res.json({ success: true, inquiry });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to update inquiry status.' });
+  }
+});
+
+router.get('/api/real-estate/marketplace/metrics', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const metrics = await getPhase4MarketplaceMetrics(tenantId);
+    res.json({ success: true, metrics });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch marketplace metrics.' });
   }
 });
 

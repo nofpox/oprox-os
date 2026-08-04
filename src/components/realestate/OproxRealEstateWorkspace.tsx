@@ -20,7 +20,14 @@ import {
   Trash2,
   Edit,
   Eye,
-  Info
+  Info,
+  UserPlus,
+  Calendar,
+  Tag,
+  Compass,
+  Sparkles,
+  Clock,
+  CheckSquare
 } from 'lucide-react';
 
 interface Portfolio {
@@ -89,10 +96,12 @@ interface DashboardMetrics {
   cityBreakdown: Record<string, number>;
 }
 
+import { OproxRealEstateMarketplace } from './OproxRealEstateMarketplace';
+
 export const OproxRealEstateWorkspace: React.FC = () => {
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'portfolios' | 'properties' | 'units' | 'owners' | 'contacts' | 'tenants' | 'leases' | 'payments' | 'securityDeposits'
-  >('overview');
+    'overview' | 'portfolios' | 'properties' | 'units' | 'owners' | 'contacts' | 'tenants' | 'leases' | 'payments' | 'securityDeposits' | 'crmLeads' | 'crmViewings' | 'crmOffers' | 'crmReservations' | 'marketplace'
+  >('marketplace');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -110,6 +119,13 @@ export const OproxRealEstateWorkspace: React.FC = () => {
   const [payments, setPayments] = useState<any[]>([]);
   const [deposits, setDeposits] = useState<any[]>([]);
   const [phase2Metrics, setPhase2Metrics] = useState<any>(null);
+
+  // Phase 3 Data state
+  const [leads, setLeads] = useState<any[]>([]);
+  const [viewings, setViewings] = useState<any[]>([]);
+  const [offers, setOffers] = useState<any[]>([]);
+  const [reservations, setReservations] = useState<any[]>([]);
+  const [crmMetrics, setCrmMetrics] = useState<any>(null);
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -167,7 +183,24 @@ export const OproxRealEstateWorkspace: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [dashRes, portRes, propRes, unitRes, ownRes, contRes, tenRes, lseRes, payRes, depRes, p2DashRes] = await Promise.all([
+      const [
+        dashRes,
+        portRes,
+        propRes,
+        unitRes,
+        ownRes,
+        contRes,
+        tenRes,
+        lseRes,
+        payRes,
+        depRes,
+        p2DashRes,
+        leadRes,
+        vwRes,
+        ofrRes,
+        resRes,
+        crmDashRes,
+      ] = await Promise.all([
         fetch('/api/real-estate/dashboard'),
         fetch('/api/real-estate/portfolios'),
         fetch('/api/real-estate/properties'),
@@ -179,6 +212,11 @@ export const OproxRealEstateWorkspace: React.FC = () => {
         fetch('/api/real-estate/payments'),
         fetch('/api/real-estate/security-deposits'),
         fetch('/api/real-estate/phase2-dashboard'),
+        fetch('/api/real-estate/leads'),
+        fetch('/api/real-estate/viewings'),
+        fetch('/api/real-estate/offers'),
+        fetch('/api/real-estate/reservations'),
+        fetch('/api/real-estate/crm-dashboard'),
       ]);
 
       if (dashRes.ok) {
@@ -224,6 +262,26 @@ export const OproxRealEstateWorkspace: React.FC = () => {
       if (p2DashRes.ok) {
         const p2 = await p2DashRes.json();
         setPhase2Metrics(p2.metrics);
+      }
+      if (leadRes.ok) {
+        const ld = await leadRes.json();
+        setLeads(ld.leads || []);
+      }
+      if (vwRes.ok) {
+        const vw = await vwRes.json();
+        setViewings(vw.viewings || []);
+      }
+      if (ofrRes.ok) {
+        const ofr = await ofrRes.json();
+        setOffers(ofr.offers || []);
+      }
+      if (resRes.ok) {
+        const rs = await resRes.json();
+        setReservations(rs.reservations || []);
+      }
+      if (crmDashRes.ok) {
+        const crmd = await crmDashRes.json();
+        setCrmMetrics(crmd.metrics);
       }
     } catch (err: any) {
       setError(err?.message || 'Failed to sync with Real Estate API.');
@@ -452,7 +510,70 @@ export const OproxRealEstateWorkspace: React.FC = () => {
           <Users className="w-4 h-4" />
           <span>Property Owners ({owners.length})</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab('crmLeads')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            activeTab === 'crmLeads'
+              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+              : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+          }`}
+        >
+          <UserPlus className="w-4 h-4" />
+          <span>Leads Pipeline ({leads.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('crmViewings')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            activeTab === 'crmViewings'
+              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+              : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+          }`}
+        >
+          <Calendar className="w-4 h-4" />
+          <span>Viewings ({viewings.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('crmOffers')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            activeTab === 'crmOffers'
+              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+              : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+          }`}
+        >
+          <Tag className="w-4 h-4" />
+          <span>Offers ({offers.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('crmReservations')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            activeTab === 'crmReservations'
+              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+              : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+          }`}
+        >
+          <Compass className="w-4 h-4" />
+          <span>Reservations ({reservations.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('marketplace')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            activeTab === 'marketplace'
+              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+              : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-amber-400" />
+          <span>PropTech Marketplace (Phase 4)</span>
+        </button>
       </div>
+
+      {/* MARKETPLACE TAB */}
+      {activeTab === 'marketplace' && <OproxRealEstateMarketplace />}
 
       {/* OVERVIEW TAB */}
       {activeTab === 'overview' && (
@@ -749,6 +870,201 @@ export const OproxRealEstateWorkspace: React.FC = () => {
             {owners.length === 0 && (
               <div className="col-span-full p-8 text-center rounded-2xl bg-slate-900/50 border border-slate-800/60 text-slate-400 text-xs">
                 No property owners registered yet.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* CRM LEADS TAB */}
+      {activeTab === 'crmLeads' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-amber-400" />
+                <span>Leads & Qualification Pipeline</span>
+              </h2>
+              <p className="text-xs text-slate-400">Total active pipeline: {crmMetrics?.totalLeads ?? leads.length} leads</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
+            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+              <span className="text-slate-400">QUALIFIED LEADS</span>
+              <p className="text-xl font-bold text-emerald-400 mt-1">{crmMetrics?.leadsByStatus?.QUALIFIED || 0}</p>
+            </div>
+            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+              <span className="text-slate-400">ACTIVE VIEWINGS</span>
+              <p className="text-xl font-bold text-amber-400 mt-1">{crmMetrics?.scheduledViewings || 0}</p>
+            </div>
+            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+              <span className="text-slate-400">ACTIVE OFFERS</span>
+              <p className="text-xl font-bold text-cyan-400 mt-1">{crmMetrics?.activeOffers || 0}</p>
+            </div>
+            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+              <span className="text-slate-400">CONVERSION RATE</span>
+              <p className="text-xl font-bold text-purple-400 mt-1">{crmMetrics?.conversionRatePercent || 0}%</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {leads.map((ld) => (
+              <div key={ld.id} className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-bold text-white text-sm">{ld.fullName}</h3>
+                    <p className="text-xs text-slate-400">{ld.phone || ld.email || 'No contact details'}</p>
+                  </div>
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded uppercase font-bold ${
+                    ld.status === 'CLOSED_WON' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                    ld.status === 'CLOSED_LOST' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
+                    'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                  }`}>
+                    {ld.status}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs text-slate-300 font-mono bg-slate-950 p-2.5 rounded-xl border border-slate-800/80">
+                  <div>
+                    <span className="text-slate-500 text-[10px]">INTENT:</span> {ld.intentType || 'RENT'}
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-[10px]">PRIORITY:</span> {ld.priority || 'MEDIUM'}
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-[10px]">BUDGET MAX:</span> {ld.budgetMaxSar ? `${Number(ld.budgetMaxSar).toLocaleString()} SAR` : 'N/A'}
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-[10px]">PREFERRED CITY:</span> {ld.preferredCity || 'Riyadh'}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {leads.length === 0 && (
+              <div className="col-span-full p-8 text-center rounded-2xl bg-slate-900/50 border border-slate-800/60 text-slate-400 text-xs">
+                No active leads in pipeline.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* CRM VIEWINGS TAB */}
+      {activeTab === 'crmViewings' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-amber-400" />
+              <span>Property Viewings Schedule</span>
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {viewings.map((vw) => (
+              <div key={vw.id} className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-amber-400" />
+                    <span className="font-bold text-white text-xs">{new Date(vw.scheduledAt).toLocaleString()}</span>
+                  </div>
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase ${
+                    vw.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                    vw.status === 'CANCELLED' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
+                    'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+                  }`}>
+                    {vw.status}
+                  </span>
+                </div>
+                <div className="text-xs text-slate-300 space-y-1 font-mono">
+                  <p><span className="text-slate-500">VIEWING CODE:</span> {vw.viewingCode}</p>
+                  {vw.feedback && <p><span className="text-slate-500">FEEDBACK:</span> {vw.feedback}</p>}
+                </div>
+              </div>
+            ))}
+
+            {viewings.length === 0 && (
+              <div className="col-span-full p-8 text-center rounded-2xl bg-slate-900/50 border border-slate-800/60 text-slate-400 text-xs">
+                No viewings scheduled yet.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* CRM OFFERS TAB */}
+      {activeTab === 'crmOffers' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <Tag className="w-5 h-5 text-amber-400" />
+              <span>Commercial Offers & Negotiations</span>
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {offers.map((ofr) => (
+              <div key={ofr.id} className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-slate-400">{ofr.offerCode}</span>
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase ${
+                    ofr.status === 'ACCEPTED' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                    ofr.status === 'REJECTED' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
+                    'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                  }`}>
+                    {ofr.status}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-lg font-black text-white">{Number(ofr.offeredAmountSar).toLocaleString()} SAR</p>
+                  <p className="text-xs text-slate-400">Payment Terms: {ofr.paymentTermMonths || 12} months</p>
+                </div>
+              </div>
+            ))}
+
+            {offers.length === 0 && (
+              <div className="col-span-full p-8 text-center rounded-2xl bg-slate-900/50 border border-slate-800/60 text-slate-400 text-xs">
+                No offers created yet.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* CRM RESERVATIONS TAB */}
+      {activeTab === 'crmReservations' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <Compass className="w-5 h-5 text-amber-400" />
+              <span>Unit Reservations & Lease Handoff</span>
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {reservations.map((rs) => (
+              <div key={rs.id} className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-slate-400">{rs.reservationCode}</span>
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase ${
+                    rs.status === 'CONVERTED_TO_LEASE' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                    rs.status === 'CANCELLED' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
+                    'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                  }`}>
+                    {rs.status}
+                  </span>
+                </div>
+                <div className="space-y-1 text-xs text-slate-300 font-mono">
+                  <p><span className="text-slate-500">RESERVATION FEE:</span> {Number(rs.reservationFeeSar).toLocaleString()} SAR</p>
+                  <p><span className="text-slate-500">EXPIRES AT:</span> {new Date(rs.expiresAt).toLocaleDateString()}</p>
+                </div>
+              </div>
+            ))}
+
+            {reservations.length === 0 && (
+              <div className="col-span-full p-8 text-center rounded-2xl bg-slate-900/50 border border-slate-800/60 text-slate-400 text-xs">
+                No active unit reservations.
               </div>
             )}
           </div>

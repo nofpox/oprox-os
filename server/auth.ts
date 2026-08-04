@@ -32,6 +32,7 @@ export function invalidateToken(token: string): void {
 
 // Helper to extract bearer token or cookie
 export function extractToken(req: Request): string | null {
+  if (!req || !req.headers) return null;
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return authHeader.substring(7);

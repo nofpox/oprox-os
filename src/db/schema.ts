@@ -1561,3 +1561,121 @@ export const oproxStudioExportManifestsTable = pgTable(
 );
 
 export type OproxStudioExportManifestRow = typeof oproxStudioExportManifestsTable.$inferSelect;
+
+// ── OPROX Studio Phase 4 Tables ───────────────────────────────────────────
+
+export const oproxStudioCommentsTable = pgTable(
+  "oprox_studio_comments",
+  {
+    id: text("id").primaryKey(), // cmt_xxx
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull().references(() => oproxStudioProjectsTable.id, { onDelete: "cascade" }),
+    pageId: text("page_id"),
+    nodeId: text("node_id"),
+    revisionId: text("revision_id"),
+    authorId: text("author_id").notNull(),
+    authorName: text("author_name").notNull(),
+    content: text("content").notNull(),
+    status: text("status").notNull().default("OPEN"), // OPEN | RESOLVED | REOPENED
+    parentCommentId: text("parent_comment_id"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("studio_cmt_tenant_idx").on(t.tenantId),
+    index("studio_cmt_proj_idx").on(t.projectId),
+  ]
+);
+
+export type OproxStudioCommentRow = typeof oproxStudioCommentsTable.$inferSelect;
+
+export const oproxStudioExperimentsTable = pgTable(
+  "oprox_studio_experiments",
+  {
+    id: text("id").primaryKey(), // expm_xxx
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull().references(() => oproxStudioProjectsTable.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    irSnapshotJson: jsonb("ir_snapshot_json").notNull(),
+    status: text("status").notNull().default("ACTIVE"), // ACTIVE | DISCARDED | PROMOTED
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("studio_expm_tenant_idx").on(t.tenantId),
+    index("studio_expm_proj_idx").on(t.projectId),
+  ]
+);
+
+export type OproxStudioExperimentRow = typeof oproxStudioExperimentsTable.$inferSelect;
+
+export const oproxStudioSyncConflictsTable = pgTable(
+  "oprox_studio_sync_conflicts",
+  {
+    id: text("id").primaryKey(), // cfl_xxx
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull().references(() => oproxStudioProjectsTable.id, { onDelete: "cascade" }),
+    filePath: text("file_path").notNull(),
+    baseHash: text("base_hash").notNull(),
+    studioHash: text("studio_hash").notNull(),
+    codeHash: text("code_hash").notNull(),
+    classification: text("classification").notNull(), // CONFLICT | STUDIO_ONLY_CHANGE | CODE_ONLY_CHANGE | NO_CHANGE
+    status: text("status").notNull().default("PENDING"), // PENDING | RESOLVED
+    resolutionStrategy: text("resolution_strategy"), // KEEP_STUDIO | KEEP_CODE | MERGE
+    resolvedBy: text("resolved_by"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    resolvedAt: timestamp("resolved_at"),
+  },
+  (t) => [
+    index("studio_cfl_tenant_idx").on(t.tenantId),
+    index("studio_cfl_proj_idx").on(t.projectId),
+  ]
+);
+
+export type OproxStudioSyncConflictRow = typeof oproxStudioSyncConflictsTable.$inferSelect;
+
+export const oproxStudioReviewsTable = pgTable(
+  "oprox_studio_reviews",
+  {
+    id: text("id").primaryKey(), // rev_xxx
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull().references(() => oproxStudioProjectsTable.id, { onDelete: "cascade" }),
+    revisionId: text("revision_id").notNull(),
+    reviewerId: text("reviewer_id").notNull(),
+    reviewerName: text("reviewer_name").notNull(),
+    status: text("status").notNull().default("PENDING"), // PENDING | APPROVED | CHANGES_REQUESTED
+    feedback: text("feedback"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("studio_rev_tenant_idx").on(t.tenantId),
+    index("studio_rev_proj_idx").on(t.projectId),
+  ]
+);
+
+export type OproxStudioReviewRow = typeof oproxStudioReviewsTable.$inferSelect;
+
+export const oproxStudioPromotionTracesTable = pgTable(
+  "oprox_studio_promotion_traces",
+  {
+    id: text("id").primaryKey(), // trc_xxx
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull().references(() => oproxStudioProjectsTable.id, { onDelete: "cascade" }),
+    revisionId: text("revision_id").notNull(),
+    workspaceId: text("workspace_id").notNull(),
+    gitBranch: text("git_branch").notNull(),
+    commitSha: text("commit_sha").notNull(),
+    changeRequestId: text("change_request_id").notNull(),
+    ciRunId: text("ci_run_id").notNull(),
+    status: text("status").notNull().default("PROMOTED"), // PROMOTED | FAILED
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("studio_trc_tenant_idx").on(t.tenantId),
+    index("studio_trc_proj_idx").on(t.projectId),
+  ]
+);
+
+export type OproxStudioPromotionTraceRow = typeof oproxStudioPromotionTracesTable.$inferSelect;

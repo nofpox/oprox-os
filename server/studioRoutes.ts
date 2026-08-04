@@ -499,4 +499,348 @@ router.get('/api/studio/deployments/:id/observability', requireAuth, async (req:
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// OPROX STUDIO PHASE 4 ENDPOINTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// In-memory fallback stores for Phase 4 persistent entities in memory mode / tests
+const inMemoryComments: any[] = [];
+const inMemoryExperiments: any[] = [];
+const inMemoryReviews: any[] = [];
+const inMemorySyncConflicts: any[] = [];
+const inMemoryPromotionTraces: any[] = [];
+
+// 21. Phase 4 — Design Comments
+router.get('/api/studio/projects/:id/comments', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const comments = inMemoryComments.filter((c) => c.projectId === req.params.id && c.tenantId === tenantId);
+    res.json({ success: true, comments });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list design comments.' });
+  }
+});
+
+router.post('/api/studio/projects/:id/comments', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const userId = req.user!.id;
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const { content, pageId, nodeId, revisionId, parentCommentId } = req.body;
+    if (!content || typeof content !== 'string') {
+      return res.status(400).json({ error: 'Field "content" string is required.' });
+    }
+
+    const comment = {
+      id: `cmt_${Math.random().toString(36).substring(2, 9)}`,
+      tenantId,
+      projectId: req.params.id,
+      pageId: pageId || null,
+      nodeId: nodeId || null,
+      revisionId: revisionId || null,
+      authorId: userId,
+      authorName: req.user?.email || 'Authenticated User',
+      content,
+      status: 'OPEN',
+      parentCommentId: parentCommentId || null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    inMemoryComments.push(comment);
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'CREATE_STUDIO_COMMENT', projectId: req.params.id, commentId: comment.id });
+    res.json({ success: true, comment });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Failed to create comment.' });
+  }
+});
+
+router.patch('/api/studio/comments/:commentId', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const comment = inMemoryComments.find((c) => c.id === req.params.commentId);
+    if (!comment || comment.tenantId !== tenantId) {
+      return res.status(404).json({ error: 'Comment not found or access denied.' });
+    }
+
+    const { status, content } = req.body;
+    if (status) comment.status = status;
+    if (content) comment.content = content;
+    comment.updatedAt = new Date().toISOString();
+
+    res.json({ success: true, comment });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Failed to update comment.' });
+  }
+});
+
+// 22. Phase 4 — Design Experiments
+router.get('/api/studio/projects/:id/experiments', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const experiments = inMemoryExperiments.filter((e) => e.projectId === req.params.id && e.tenantId === tenantId);
+    res.json({ success: true, experiments });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list experiments.' });
+  }
+});
+
+router.post('/api/studio/projects/:id/experiments', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const userId = req.user!.id;
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const { name, description, irSnapshot } = req.body;
+    if (!name || typeof name !== 'string') {
+      return res.status(400).json({ error: 'Field "name" string is required.' });
+    }
+
+    const experiment = {
+      id: `expm_${Math.random().toString(36).substring(2, 9)}`,
+      tenantId,
+      projectId: req.params.id,
+      name,
+      description: description || '',
+      irSnapshotJson: irSnapshot || projectData.ir,
+      status: 'ACTIVE',
+      createdBy: userId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    inMemoryExperiments.push(experiment);
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'CREATE_STUDIO_EXPERIMENT', projectId: req.params.id, experimentId: experiment.id });
+    res.json({ success: true, experiment });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Failed to create experiment.' });
+  }
+});
+
+router.post('/api/studio/experiments/:expId/promote', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const experiment = inMemoryExperiments.find((e) => e.id === req.params.expId);
+    if (!experiment || experiment.tenantId !== tenantId) {
+      return res.status(404).json({ error: 'Experiment not found or access denied.' });
+    }
+
+    experiment.status = 'PROMOTED';
+    experiment.updatedAt = new Date().toISOString();
+
+    // Save promoted IR as a new revision on project
+    const saveResult = await saveStudioProjectIr({
+      projectId: experiment.projectId,
+      tenantId,
+      authorId: req.user!.id,
+      baseRevisionNumber: 0, // Force save
+      updatedIr: experiment.irSnapshotJson,
+      changeSummary: `Promoted Studio experiment "${experiment.name}"`,
+    });
+
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'PROMOTE_STUDIO_EXPERIMENT', experimentId: experiment.id });
+    res.json({ success: true, experiment, saveResult });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Failed to promote experiment.' });
+  }
+});
+
+// 23. Phase 4 — Three-Way Design/Code Synchronization
+router.post('/api/studio/projects/:id/sync/analyze', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const { filePath, baseSource, studioSource, codeSource } = req.body;
+    if (!filePath || typeof filePath !== 'string') {
+      return res.status(400).json({ error: 'Field "filePath" string is required.' });
+    }
+
+    const { analyzeThreeWaySync } = await import('../src/lib/studio/studioPhase4Engine');
+    const syncAnalysis = analyzeThreeWaySync(filePath, baseSource || '', studioSource || '', codeSource || '');
+
+    if (syncAnalysis.classification === 'CONFLICT') {
+      const conflictRecord = {
+        id: `cfl_${Math.random().toString(36).substring(2, 9)}`,
+        tenantId,
+        projectId: req.params.id,
+        filePath,
+        baseHash: syncAnalysis.baseHash,
+        studioHash: syncAnalysis.studioHash,
+        codeHash: syncAnalysis.codeHash,
+        classification: 'CONFLICT',
+        status: 'PENDING',
+        createdAt: new Date().toISOString(),
+      };
+      inMemorySyncConflicts.push(conflictRecord);
+    }
+
+    res.json({ success: true, analysis: syncAnalysis });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Three-way sync analysis failed.' });
+  }
+});
+
+router.post('/api/studio/projects/:id/sync/resolve', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const { conflictId, strategy } = req.body;
+    if (!conflictId || !['KEEP_STUDIO', 'KEEP_CODE', 'MERGE'].includes(strategy)) {
+      return res.status(400).json({ error: 'Valid "conflictId" and "strategy" (KEEP_STUDIO | KEEP_CODE | MERGE) required.' });
+    }
+
+    const conflict = inMemorySyncConflicts.find((c) => c.id === conflictId && c.projectId === req.params.id);
+    if (conflict) {
+      conflict.status = 'RESOLVED';
+      conflict.resolutionStrategy = strategy;
+      conflict.resolvedBy = req.user!.id;
+      conflict.resolvedAt = new Date().toISOString();
+    }
+
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'RESOLVE_SYNC_CONFLICT', projectId: req.params.id, conflictId, strategy });
+    res.json({ success: true, resolved: true, strategy });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Sync resolution failed.' });
+  }
+});
+
+// 24. Phase 4 — Reviews & RBAC
+router.get('/api/studio/projects/:id/reviews', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const reviews = inMemoryReviews.filter((r) => r.projectId === req.params.id && r.tenantId === tenantId);
+    res.json({ success: true, reviews });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list reviews.' });
+  }
+});
+
+router.post('/api/studio/projects/:id/reviews', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const { revisionId, status, feedback } = req.body;
+    if (!revisionId || !['APPROVED', 'CHANGES_REQUESTED', 'PENDING'].includes(status)) {
+      return res.status(400).json({ error: 'Valid "revisionId" and "status" required.' });
+    }
+
+    const review = {
+      id: `rev_${Math.random().toString(36).substring(2, 9)}`,
+      tenantId,
+      projectId: req.params.id,
+      revisionId,
+      reviewerId: req.user!.id,
+      reviewerName: req.user?.email || 'Reviewer',
+      status,
+      feedback: feedback || '',
+      createdAt: new Date().toISOString(),
+    };
+
+    inMemoryReviews.push(review);
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'SUBMIT_STUDIO_REVIEW', projectId: req.params.id, reviewId: review.id, status });
+    res.json({ success: true, review });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Failed to submit review.' });
+  }
+});
+
+// 25. Phase 4 — Responsive Audit
+router.get('/api/studio/projects/:id/responsive-audit', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const { validateResponsiveLayout } = await import('../src/lib/studio/studioPhase4Engine');
+    const findings = validateResponsiveLayout(projectData.ir);
+
+    res.json({ success: true, findings });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Responsive audit failed.' });
+  }
+});
+
+// 26. Phase 4 — Token Dependency Graph
+router.get('/api/studio/projects/:id/token-graph', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const { buildTokenDependencyGraph } = await import('../src/lib/studio/studioPhase4Engine');
+    const graph = buildTokenDependencyGraph(projectData.ir.tokens);
+
+    res.json({ success: true, graph });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to build token dependency graph.' });
+  }
+});
+
+// 27. Phase 4 — Governed Copilot AI Proposal
+router.post('/api/studio/projects/:id/copilot/propose', requireAuth, aiGovernanceGate, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const { prompt } = req.body;
+    if (!prompt || typeof prompt !== 'string') {
+      return res.status(400).json({ error: 'Field "prompt" string is required.' });
+    }
+
+    const { generateStudioAiChangeset } = await import('../src/lib/studio/studioPhase4Engine');
+    const changeset = generateStudioAiChangeset(projectData.ir, prompt);
+
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'GENERATE_STUDIO_AI_PROPOSAL', projectId: req.params.id, prompt });
+    res.json({ success: true, changeset });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'AI proposal generation failed.' });
+  }
+});
+
+// 28. Phase 4 — Governed Code Promotion
+router.post('/api/studio/projects/:id/promote-governed', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const { revisionId, workspaceId } = req.body;
+    if (!revisionId || typeof revisionId !== 'string') {
+      return res.status(400).json({ error: 'Field "revisionId" string is required.' });
+    }
+
+    const { executeGovernedPromotion } = await import('../src/lib/studio/studioPhase4Engine');
+    const promotionTrace = executeGovernedPromotion(projectData.ir, revisionId, workspaceId || 'ws_default');
+
+    inMemoryPromotionTraces.push({
+      ...promotionTrace,
+      tenantId,
+    });
+
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'GOVERNED_STUDIO_PROMOTION', projectId: req.params.id, revisionId });
+    res.json({ success: true, trace: promotionTrace });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Governed promotion failed.' });
+  }
+});
+
 export default router;

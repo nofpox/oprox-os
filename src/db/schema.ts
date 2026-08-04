@@ -1874,3 +1874,293 @@ export const realEstateAmenitiesTable = pgTable(
 );
 
 export type RealEstateAmenityRow = typeof realEstateAmenitiesTable.$inferSelect;
+
+// ── OPROX Real Estate Phase 2 Tables ───────────────────────────────────────
+
+export const realEstateContactsTable = pgTable(
+  "re_contacts",
+  {
+    id: text("id").primaryKey(), // cont_xxx
+    tenantId: text("tenant_id").notNull(),
+    type: text("type").notNull().default("INDIVIDUAL"), // INDIVIDUAL | COMPANY
+    fullName: text("full_name").notNull(),
+    arabicName: text("arabic_name"),
+    mobile: text("mobile"),
+    email: text("email"),
+    nationalIdOrIqama: text("national_id_or_iqama"),
+    nationality: text("nationality"),
+    preferredLanguage: text("preferred_language").default("ar"),
+    companyName: text("company_name"),
+    crNumber: text("cr_number"),
+    vatNumber: text("vat_number"),
+    authorizedRep: text("authorized_rep"),
+    status: text("status").notNull().default("ACTIVE"), // ACTIVE | INACTIVE
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_contacts_tenant_idx").on(t.tenantId),
+    index("re_contacts_type_idx").on(t.type),
+    index("re_contacts_nat_id_idx").on(t.nationalIdOrIqama),
+    index("re_contacts_cr_idx").on(t.crNumber),
+    index("re_contacts_status_idx").on(t.status),
+  ]
+);
+
+export type RealEstateContactRow = typeof realEstateContactsTable.$inferSelect;
+
+export const realEstateTenantsTable = pgTable(
+  "re_tenants",
+  {
+    id: text("id").primaryKey(), // ret_xxx
+    tenantId: text("tenant_id").notNull(),
+    contactId: text("contact_id").notNull().references(() => realEstateContactsTable.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("ACTIVE"), // ACTIVE | BLACKLISTED | INACTIVE
+    creditRating: text("credit_rating"), // EXCELLENT | GOOD | FAIR | POOR
+    notes: text("notes"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_tenants_tenant_idx").on(t.tenantId),
+    index("re_tenants_contact_idx").on(t.contactId),
+    index("re_tenants_status_idx").on(t.status),
+  ]
+);
+
+export type RealEstateTenantRow = typeof realEstateTenantsTable.$inferSelect;
+
+export const realEstateLeasesTable = pgTable(
+  "re_leases",
+  {
+    id: text("id").primaryKey(), // lse_xxx
+    tenantId: text("tenant_id").notNull(),
+    leaseNumber: text("lease_number").notNull(),
+    propertyId: text("property_id").notNull().references(() => realEstatePropertiesTable.id, { onDelete: "cascade" }),
+    reTenantId: text("re_tenant_id").notNull().references(() => realEstateTenantsTable.id, { onDelete: "cascade" }),
+    leaseType: text("lease_type").notNull().default("RESIDENTIAL"), // RESIDENTIAL | COMMERCIAL | INDUSTRIAL | RETAIL
+    startDate: text("start_date").notNull(), // YYYY-MM-DD
+    endDate: text("end_date").notNull(), // YYYY-MM-DD
+    contractValueSar: numeric("contract_value_sar").notNull(),
+    currency: text("currency").notNull().default("SAR"),
+    paymentFrequency: text("payment_frequency").notNull().default("QUARTERLY"), // MONTHLY | QUARTERLY | SEMI_ANNUAL | ANNUAL | CUSTOM
+    securityDepositSar: numeric("security_deposit_sar").default("0"),
+    gracePeriodDays: integer("grace_period_days").default(0),
+    renewalOption: boolean("renewal_option").default(false),
+    noticePeriodDays: integer("notice_period_days").default(30),
+    ejarContractNumber: text("ejar_contract_number"),
+    ejarStatus: text("ejar_status").default("NOT_CONFIGURED"),
+    terms: text("terms"),
+    status: text("status").notNull().default("DRAFT"), // DRAFT | PENDING_APPROVAL | APPROVED | ACTIVE | EXPIRING | RENEWAL_PENDING | TERMINATION_PENDING | TERMINATED | EXPIRED | CANCELLED
+    createdBy: text("created_by").notNull(),
+    approvedBy: text("approved_by"),
+    approvedAt: timestamp("approved_at"),
+    activatedAt: timestamp("activated_at"),
+    terminatedAt: timestamp("terminated_at"),
+    terminationReason: text("termination_reason"),
+    parentLeaseId: text("parent_lease_id"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_leases_tenant_idx").on(t.tenantId),
+    index("re_leases_num_idx").on(t.leaseNumber),
+    index("re_leases_prop_idx").on(t.propertyId),
+    index("re_leases_ret_idx").on(t.reTenantId),
+    index("re_leases_status_idx").on(t.status),
+  ]
+);
+
+export type RealEstateLeaseRow = typeof realEstateLeasesTable.$inferSelect;
+
+export const realEstateLeaseUnitsTable = pgTable(
+  "re_lease_units",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: text("tenant_id").notNull(),
+    leaseId: text("lease_id").notNull().references(() => realEstateLeasesTable.id, { onDelete: "cascade" }),
+    unitId: text("unit_id").notNull().references(() => realEstateUnitsTable.id, { onDelete: "cascade" }),
+    allocatedRentSar: numeric("allocated_rent_sar"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_lease_units_tenant_idx").on(t.tenantId),
+    index("re_lease_units_lease_idx").on(t.leaseId),
+    index("re_lease_units_unit_idx").on(t.unitId),
+  ]
+);
+
+export type RealEstateLeaseUnitRow = typeof realEstateLeaseUnitsTable.$inferSelect;
+
+export const realEstateLeaseSchedulesTable = pgTable(
+  "re_lease_schedules",
+  {
+    id: text("id").primaryKey(), // sch_xxx
+    tenantId: text("tenant_id").notNull(),
+    leaseId: text("lease_id").notNull().references(() => realEstateLeasesTable.id, { onDelete: "cascade" }),
+    installmentNumber: integer("installment_number").notNull(),
+    dueDate: text("due_date").notNull(), // YYYY-MM-DD
+    amountSar: numeric("amount_sar").notNull(),
+    paidAmountSar: numeric("paid_amount_sar").notNull().default("0"),
+    outstandingAmountSar: numeric("outstanding_amount_sar").notNull(),
+    status: text("status").notNull().default("UPCOMING"), // UPCOMING | DUE | PARTIALLY_PAID | PAID | OVERDUE | WAIVED | CANCELLED
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_lease_sched_tenant_idx").on(t.tenantId),
+    index("re_lease_sched_lease_idx").on(t.leaseId),
+    index("re_lease_sched_due_idx").on(t.dueDate),
+    index("re_lease_sched_status_idx").on(t.status),
+  ]
+);
+
+export type RealEstateLeaseScheduleRow = typeof realEstateLeaseSchedulesTable.$inferSelect;
+
+export const realEstateLeaseChargesTable = pgTable(
+  "re_lease_charges",
+  {
+    id: text("id").primaryKey(), // chg_xxx
+    tenantId: text("tenant_id").notNull(),
+    leaseId: text("lease_id").notNull().references(() => realEstateLeasesTable.id, { onDelete: "cascade" }),
+    scheduleId: text("schedule_id").references(() => realEstateLeaseSchedulesTable.id, { onDelete: "set null" }),
+    chargeType: text("charge_type").notNull(), // RENT | SECURITY_DEPOSIT | SERVICE_CHARGE | ADMIN_FEE | UTILITY | MAINTENANCE | OTHER
+    description: text("description").notNull(),
+    amountSar: numeric("amount_sar").notNull(),
+    paidAmountSar: numeric("paid_amount_sar").notNull().default("0"),
+    outstandingAmountSar: numeric("outstanding_amount_sar").notNull(),
+    status: text("status").notNull().default("DUE"), // DUE | PARTIALLY_PAID | PAID | WAIVED | CANCELLED
+    invoiceId: text("invoice_id"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_lease_charges_tenant_idx").on(t.tenantId),
+    index("re_lease_charges_lease_idx").on(t.leaseId),
+    index("re_lease_charges_type_idx").on(t.chargeType),
+    index("re_lease_charges_status_idx").on(t.status),
+  ]
+);
+
+export type RealEstateLeaseChargeRow = typeof realEstateLeaseChargesTable.$inferSelect;
+
+export const realEstatePaymentsTable = pgTable(
+  "re_payments",
+  {
+    id: text("id").primaryKey(), // pay_xxx
+    tenantId: text("tenant_id").notNull(),
+    leaseId: text("lease_id").references(() => realEstateLeasesTable.id, { onDelete: "set null" }),
+    reTenantId: text("re_tenant_id").references(() => realEstateTenantsTable.id, { onDelete: "set null" }),
+    paymentNumber: text("payment_number").notNull(),
+    paymentDate: text("payment_date").notNull(), // YYYY-MM-DD
+    amountSar: numeric("amount_sar").notNull(),
+    unallocatedAmountSar: numeric("unallocated_amount_sar").notNull(),
+    currency: text("currency").notNull().default("SAR"),
+    paymentMethod: text("payment_method").notNull().default("BANK_TRANSFER"), // BANK_TRANSFER | CARD | CASH | SADAD | OTHER
+    providerReference: text("provider_reference"),
+    paymentStatus: text("payment_status").notNull().default("CONFIRMED"), // PENDING | CONFIRMED | FAILED | REFUNDED | PARTIALLY_REFUNDED | CANCELLED
+    notes: text("notes"),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_payments_tenant_idx").on(t.tenantId),
+    index("re_payments_lease_idx").on(t.leaseId),
+    index("re_payments_ret_idx").on(t.reTenantId),
+    index("re_payments_num_idx").on(t.paymentNumber),
+    index("re_payments_status_idx").on(t.paymentStatus),
+  ]
+);
+
+export type RealEstatePaymentRow = typeof realEstatePaymentsTable.$inferSelect;
+
+export const realEstatePaymentAllocationsTable = pgTable(
+  "re_payment_allocations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: text("tenant_id").notNull(),
+    paymentId: text("payment_id").notNull().references(() => realEstatePaymentsTable.id, { onDelete: "cascade" }),
+    chargeId: text("charge_id").references(() => realEstateLeaseChargesTable.id, { onDelete: "set null" }),
+    scheduleId: text("schedule_id").references(() => realEstateLeaseSchedulesTable.id, { onDelete: "set null" }),
+    allocatedAmountSar: numeric("allocated_amount_sar").notNull(),
+    allocatedAt: timestamp("allocated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_pay_alloc_tenant_idx").on(t.tenantId),
+    index("re_pay_alloc_payment_idx").on(t.paymentId),
+    index("re_pay_alloc_charge_idx").on(t.chargeId),
+    index("re_pay_alloc_sched_idx").on(t.scheduleId),
+  ]
+);
+
+export type RealEstatePaymentAllocationRow = typeof realEstatePaymentAllocationsTable.$inferSelect;
+
+export const realEstateSecurityDepositsTable = pgTable(
+  "re_security_deposits",
+  {
+    id: text("id").primaryKey(), // dep_xxx
+    tenantId: text("tenant_id").notNull(),
+    leaseId: text("lease_id").notNull().references(() => realEstateLeasesTable.id, { onDelete: "cascade" }),
+    reTenantId: text("re_tenant_id").notNull().references(() => realEstateTenantsTable.id, { onDelete: "cascade" }),
+    amountSar: numeric("amount_sar").notNull(),
+    heldAmountSar: numeric("held_amount_sar").notNull(),
+    deductionsAmountSar: numeric("deductions_amount_sar").default("0"),
+    refundedAmountSar: numeric("refunded_amount_sar").default("0"),
+    status: text("status").notNull().default("REQUIRED"), // REQUIRED | INVOICED | RECEIVED | HELD | PARTIALLY_APPLIED | APPLIED | REFUND_PENDING | REFUNDED | FORFEITED
+    notes: text("notes"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_sec_dep_tenant_idx").on(t.tenantId),
+    index("re_sec_dep_lease_idx").on(t.leaseId),
+    index("re_sec_dep_ret_idx").on(t.reTenantId),
+    index("re_sec_dep_status_idx").on(t.status),
+  ]
+);
+
+export type RealEstateSecurityDepositRow = typeof realEstateSecurityDepositsTable.$inferSelect;
+
+export const realEstateLeaseEventsTable = pgTable(
+  "re_lease_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: text("tenant_id").notNull(),
+    leaseId: text("lease_id").notNull().references(() => realEstateLeasesTable.id, { onDelete: "cascade" }),
+    eventType: text("event_type").notNull(), // CREATED | APPROVED | ACTIVATED | RENEWED | TERMINATED | MOVE_IN | MOVE_OUT | PAYMENT_RECEIVED | DEPOSIT_HELD | CANCELLED
+    actorId: text("actor_id").notNull(),
+    notes: text("notes"),
+    eventDataJson: text("event_data_json"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_lease_events_tenant_idx").on(t.tenantId),
+    index("re_lease_events_lease_idx").on(t.leaseId),
+    index("re_lease_events_type_idx").on(t.eventType),
+  ]
+);
+
+export type RealEstateLeaseEventRow = typeof realEstateLeaseEventsTable.$inferSelect;
+
+export const realEstateLeaseDocumentsTable = pgTable(
+  "re_lease_documents",
+  {
+    id: text("id").primaryKey(), // doc_xxx
+    tenantId: text("tenant_id").notNull(),
+    leaseId: text("lease_id").notNull().references(() => realEstateLeasesTable.id, { onDelete: "cascade" }),
+    documentType: text("document_type").notNull(), // SIGNED_LEASE | TENANT_ID | CR_CERTIFICATE | PAYMENT_PROOF | TERMINATION_NOTICE | RENEWAL_DOC | OTHER
+    title: text("title").notNull(),
+    fileUrl: text("file_url").notNull(),
+    fileSize: integer("file_size"),
+    uploadedBy: text("uploaded_by").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_lease_docs_tenant_idx").on(t.tenantId),
+    index("re_lease_docs_lease_idx").on(t.leaseId),
+    index("re_lease_docs_type_idx").on(t.documentType),
+  ]
+);
+
+export type RealEstateLeaseDocumentRow = typeof realEstateLeaseDocumentsTable.$inferSelect;

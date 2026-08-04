@@ -90,16 +90,26 @@ interface DashboardMetrics {
 }
 
 export const OproxRealEstateWorkspace: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'portfolios' | 'properties' | 'units' | 'owners'>('overview');
+  const [activeTab, setActiveTab] = useState<
+    'overview' | 'portfolios' | 'properties' | 'units' | 'owners' | 'contacts' | 'tenants' | 'leases' | 'payments' | 'securityDeposits'
+  >('overview');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Data state
+  // Phase 1 Data state
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [owners, setOwners] = useState<Owner[]>([]);
+
+  // Phase 2 Data state
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [leases, setLeases] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [deposits, setDeposits] = useState<any[]>([]);
+  const [phase2Metrics, setPhase2Metrics] = useState<any>(null);
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -112,6 +122,10 @@ export const OproxRealEstateWorkspace: React.FC = () => {
   const [isCreatePortfolioModalOpen, setIsCreatePortfolioModalOpen] = useState(false);
   const [isCreateUnitModalOpen, setIsCreateUnitModalOpen] = useState(false);
   const [isCreateOwnerModalOpen, setIsCreateOwnerModalOpen] = useState(false);
+  const [isCreateContactModalOpen, setIsCreateContactModalOpen] = useState(false);
+  const [isCreateTenantModalOpen, setIsCreateTenantModalOpen] = useState(false);
+  const [isCreateLeaseModalOpen, setIsCreateLeaseModalOpen] = useState(false);
+  const [isCreatePaymentModalOpen, setIsCreatePaymentModalOpen] = useState(false);
 
   // Form values
   const [newPropName, setNewPropName] = useState('');
@@ -132,17 +146,39 @@ export const OproxRealEstateWorkspace: React.FC = () => {
   const [newOwnerType, setNewOwnerType] = useState('INDIVIDUAL');
   const [newOwnerIdCr, setNewOwnerIdCr] = useState('');
 
+  // Phase 2 Form values
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactType, setNewContactType] = useState('INDIVIDUAL');
+  const [newContactCrVat, setNewContactCrVat] = useState('');
+
+  const [newTenantContactId, setNewTenantContactId] = useState('');
+
+  const [newLeasePropId, setNewLeasePropId] = useState('');
+  const [newLeaseTenantId, setNewLeaseTenantId] = useState('');
+  const [newLeaseValue, setNewLeaseValue] = useState('120000');
+  const [newLeaseStart, setNewLeaseStart] = useState('2026-01-01');
+  const [newLeaseEnd, setNewLeaseEnd] = useState('2026-12-31');
+
+  const [newPaymentLeaseId, setNewPaymentLeaseId] = useState('');
+  const [newPaymentAmount, setNewPaymentAmount] = useState('30000');
+
   // Fetch initial data
   const fetchData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [dashRes, portRes, propRes, unitRes, ownRes] = await Promise.all([
+      const [dashRes, portRes, propRes, unitRes, ownRes, contRes, tenRes, lseRes, payRes, depRes, p2DashRes] = await Promise.all([
         fetch('/api/real-estate/dashboard'),
         fetch('/api/real-estate/portfolios'),
         fetch('/api/real-estate/properties'),
         fetch('/api/real-estate/units'),
         fetch('/api/real-estate/owners'),
+        fetch('/api/real-estate/contacts'),
+        fetch('/api/real-estate/tenants'),
+        fetch('/api/real-estate/leases'),
+        fetch('/api/real-estate/payments'),
+        fetch('/api/real-estate/security-deposits'),
+        fetch('/api/real-estate/phase2-dashboard'),
       ]);
 
       if (dashRes.ok) {
@@ -164,6 +200,30 @@ export const OproxRealEstateWorkspace: React.FC = () => {
       if (ownRes.ok) {
         const o = await ownRes.json();
         setOwners(o.owners || []);
+      }
+      if (contRes.ok) {
+        const c = await contRes.json();
+        setContacts(c.contacts || []);
+      }
+      if (tenRes.ok) {
+        const t = await tenRes.json();
+        setTenants(t.tenants || []);
+      }
+      if (lseRes.ok) {
+        const l = await lseRes.json();
+        setLeases(l.leases || []);
+      }
+      if (payRes.ok) {
+        const py = await payRes.json();
+        setPayments(py.payments || []);
+      }
+      if (depRes.ok) {
+        const dp = await depRes.json();
+        setDeposits(dp.deposits || []);
+      }
+      if (p2DashRes.ok) {
+        const p2 = await p2DashRes.json();
+        setPhase2Metrics(p2.metrics);
       }
     } catch (err: any) {
       setError(err?.message || 'Failed to sync with Real Estate API.');

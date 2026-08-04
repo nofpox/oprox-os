@@ -34,6 +34,38 @@ import {
   listPropertyOwners,
   getRealEstateDashboardMetrics,
 } from '../src/lib/realestate/realEstateStore';
+import {
+  listContacts,
+  getContact,
+  createContact,
+  updateContact,
+  deleteContact,
+  listTenants,
+  getTenant,
+  createTenant,
+  updateTenant,
+  listLeases,
+  getLease,
+  createLease,
+  transitionLeaseStatus,
+  renewLease,
+  generateRentSchedules,
+  listLeaseSchedules,
+  listLeaseCharges,
+  createLeaseCharge,
+  createPayment,
+  listPayments,
+  getPayment,
+  autoAllocatePayment,
+  createSecurityDeposit,
+  listSecurityDeposits,
+  processSecurityDepositRefund,
+  listLeaseEvents,
+  uploadLeaseDocument,
+  listLeaseDocuments,
+  getLeaseFinancialSummary,
+  getPhase2DashboardMetrics,
+} from '../src/lib/realestate/realEstatePhase2Store';
 
 const router = Router();
 
@@ -513,6 +545,363 @@ router.get('/api/real-estate/properties/:propertyId/owners', requireAuth, async 
     res.json({ success: true, owners });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || 'Failed to list property owners.' });
+  }
+});
+
+// ── PHASE 2: CONTACTS ──────────────────────────────────────────────────────
+
+router.get('/api/real-estate/contacts', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const contacts = await listContacts(tenantId);
+    res.json({ success: true, contacts });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list contacts.' });
+  }
+});
+
+router.post('/api/real-estate/contacts', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const contact = await createContact({ ...req.body, tenantId });
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'CREATE_RE_CONTACT', contactId: contact.id });
+    res.json({ success: true, contact });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to create contact.' });
+  }
+});
+
+router.get('/api/real-estate/contacts/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const contact = await getContact(tenantId, req.params.id);
+    if (!contact) return res.status(404).json({ error: 'Contact not found.' });
+    res.json({ success: true, contact });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch contact.' });
+  }
+});
+
+router.put('/api/real-estate/contacts/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const contact = await updateContact(tenantId, req.params.id, req.body);
+    if (!contact) return res.status(404).json({ error: 'Contact not found.' });
+    res.json({ success: true, contact });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to update contact.' });
+  }
+});
+
+router.delete('/api/real-estate/contacts/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const deleted = await deleteContact(tenantId, req.params.id);
+    res.json({ success: true, deleted });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to delete contact.' });
+  }
+});
+
+// ── PHASE 2: TENANTS ───────────────────────────────────────────────────────
+
+router.get('/api/real-estate/tenants', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const tenants = await listTenants(tenantId);
+    res.json({ success: true, tenants });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list real estate tenants.' });
+  }
+});
+
+router.post('/api/real-estate/tenants', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const tenantRecord = await createTenant({ ...req.body, tenantId });
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'CREATE_RE_TENANT', tenantRecordId: tenantRecord.id });
+    res.json({ success: true, tenant: tenantRecord });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to create real estate tenant.' });
+  }
+});
+
+router.get('/api/real-estate/tenants/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const tenantRecord = await getTenant(tenantId, req.params.id);
+    if (!tenantRecord) return res.status(404).json({ error: 'Tenant record not found.' });
+    res.json({ success: true, tenant: tenantRecord });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch tenant.' });
+  }
+});
+
+router.put('/api/real-estate/tenants/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const tenantRecord = await updateTenant(tenantId, req.params.id, req.body);
+    if (!tenantRecord) return res.status(404).json({ error: 'Tenant record not found.' });
+    res.json({ success: true, tenant: tenantRecord });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to update tenant.' });
+  }
+});
+
+// ── PHASE 2: LEASES ────────────────────────────────────────────────────────
+
+router.get('/api/real-estate/leases', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { propertyId, reTenantId, status } = req.query;
+    const leases = await listLeases(tenantId, {
+      propertyId: propertyId ? String(propertyId) : undefined,
+      reTenantId: reTenantId ? String(reTenantId) : undefined,
+      status: status ? String(status) : undefined,
+    });
+    res.json({ success: true, leases });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list leases.' });
+  }
+});
+
+router.post('/api/real-estate/leases', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const userId = req.user!.id;
+    const lease = await createLease({ ...req.body, tenantId, createdBy: userId });
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'CREATE_RE_LEASE', leaseId: lease.id });
+    res.json({ success: true, lease });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to create lease.' });
+  }
+});
+
+router.get('/api/real-estate/leases/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const lease = await getLease(tenantId, req.params.id);
+    if (!lease) return res.status(404).json({ error: 'Lease not found.' });
+    res.json({ success: true, lease });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch lease.' });
+  }
+});
+
+router.put('/api/real-estate/leases/:id/status', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const userId = req.user!.id;
+    const { status, notes, terminationReason } = req.body;
+
+    if (!status) return res.status(400).json({ error: 'Field "status" is required.' });
+
+    const lease = await transitionLeaseStatus(tenantId, req.params.id, status, userId, {
+      notes,
+      terminationReason,
+    });
+
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'TRANSITION_RE_LEASE', leaseId: lease.id, status });
+    res.json({ success: true, lease });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Lease status transition failed.' });
+  }
+});
+
+router.post('/api/real-estate/leases/:id/renew', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const userId = req.user!.id;
+    const { startDate, endDate, contractValueSar, paymentFrequency } = req.body;
+
+    const childLease = await renewLease(tenantId, req.params.id, {
+      startDate,
+      endDate,
+      contractValueSar,
+      paymentFrequency,
+      actorId: userId,
+    });
+
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'RENEW_RE_LEASE', parentLeaseId: req.params.id, childLeaseId: childLease.id });
+    res.json({ success: true, lease: childLease });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to renew lease.' });
+  }
+});
+
+router.post('/api/real-estate/leases/:id/schedules/generate', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const schedules = await generateRentSchedules(tenantId, req.params.id);
+    res.json({ success: true, schedules });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to generate rent schedules.' });
+  }
+});
+
+router.get('/api/real-estate/leases/:id/schedules', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const schedules = await listLeaseSchedules(tenantId, req.params.id);
+    res.json({ success: true, schedules });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list lease schedules.' });
+  }
+});
+
+router.get('/api/real-estate/leases/:id/charges', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const charges = await listLeaseCharges(tenantId, req.params.id);
+    res.json({ success: true, charges });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list lease charges.' });
+  }
+});
+
+router.post('/api/real-estate/leases/:id/charges', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const charge = await createLeaseCharge({ ...req.body, tenantId, leaseId: req.params.id });
+    res.json({ success: true, charge });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to create lease charge.' });
+  }
+});
+
+router.get('/api/real-estate/leases/:id/events', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const events = await listLeaseEvents(tenantId, req.params.id);
+    res.json({ success: true, events });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list lease events.' });
+  }
+});
+
+router.get('/api/real-estate/leases/:id/documents', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const documents = await listLeaseDocuments(tenantId, req.params.id);
+    res.json({ success: true, documents });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list lease documents.' });
+  }
+});
+
+router.post('/api/real-estate/leases/:id/documents', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const userId = req.user!.id;
+    const document = await uploadLeaseDocument({ ...req.body, tenantId, leaseId: req.params.id, uploadedBy: userId });
+    res.json({ success: true, document });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to upload lease document.' });
+  }
+});
+
+router.get('/api/real-estate/leases/:id/financials', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const summary = await getLeaseFinancialSummary(tenantId, req.params.id);
+    res.json({ success: true, summary });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch lease financial summary.' });
+  }
+});
+
+// ── PHASE 2: PAYMENTS ──────────────────────────────────────────────────────
+
+router.get('/api/real-estate/payments', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { leaseId } = req.query;
+    const payments = await listPayments(tenantId, leaseId ? String(leaseId) : undefined);
+    res.json({ success: true, payments });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list payments.' });
+  }
+});
+
+router.post('/api/real-estate/payments', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const userId = req.user!.id;
+    const payment = await createPayment({ ...req.body, tenantId, createdBy: userId });
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'CREATE_RE_PAYMENT', paymentId: payment.id });
+    res.json({ success: true, payment });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to record payment.' });
+  }
+});
+
+router.get('/api/real-estate/payments/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const payment = await getPayment(tenantId, req.params.id);
+    if (!payment) return res.status(404).json({ error: 'Payment not found.' });
+    res.json({ success: true, payment });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch payment.' });
+  }
+});
+
+router.post('/api/real-estate/payments/:id/allocate', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { leaseId } = req.body;
+    if (!leaseId) return res.status(400).json({ error: 'Field "leaseId" is required.' });
+    const allocatedAmount = await autoAllocatePayment(tenantId, req.params.id, leaseId);
+    res.json({ success: true, allocatedAmount });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to allocate payment.' });
+  }
+});
+
+// ── PHASE 2: SECURITY DEPOSITS ──────────────────────────────────────────────
+
+router.get('/api/real-estate/security-deposits', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { leaseId } = req.query;
+    const deposits = await listSecurityDeposits(tenantId, leaseId ? String(leaseId) : undefined);
+    res.json({ success: true, deposits });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list security deposits.' });
+  }
+});
+
+router.post('/api/real-estate/security-deposits', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const deposit = await createSecurityDeposit({ ...req.body, tenantId });
+    res.json({ success: true, deposit });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to create security deposit.' });
+  }
+});
+
+router.post('/api/real-estate/security-deposits/:id/refund', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { deductionsSar, notes } = req.body;
+    const deposit = await processSecurityDepositRefund(tenantId, req.params.id, Number(deductionsSar || 0), notes);
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'REFUND_RE_SECURITY_DEPOSIT', depositId: deposit.id });
+    res.json({ success: true, deposit });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to process deposit refund.' });
+  }
+});
+
+// ── PHASE 2 DASHBOARD METRICS ──────────────────────────────────────────────
+
+router.get('/api/real-estate/phase2-dashboard', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const metrics = await getPhase2DashboardMetrics(tenantId);
+    res.json({ success: true, metrics });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch Phase 2 dashboard metrics.' });
   }
 });
 

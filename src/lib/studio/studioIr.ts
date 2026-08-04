@@ -21,7 +21,56 @@ export type StudioComponentType =
   | 'Table'
   | 'Image'
   | 'Divider'
-  | 'Badge';
+  | 'Badge'
+  | 'ComponentInstance'
+  | 'Form'
+  | 'Modal'
+  | 'Drawer'
+  | 'Tabs'
+  | 'Accordion';
+
+export interface StudioPrototypeVariable {
+  key: string;
+  type: 'boolean' | 'string' | 'number' | 'enum';
+  defaultValue: any;
+  options?: string[]; // for enum
+}
+
+export interface StudioDataSourceDefinition {
+  id: string;
+  name: string;
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  url: string;
+  headers?: Record<string, string>;
+  params?: Record<string, string>;
+  reqSchema?: Record<string, any>;
+  resSchema?: Record<string, any>;
+}
+
+export interface StudioComponentVariant {
+  id: string;
+  name: string;
+  propsOverride: Record<string, any>;
+  styleOverride: Record<string, any>;
+}
+
+export interface StudioReusableComponentDef {
+  id: string;
+  name: string;
+  category?: string;
+  masterNode: StudioNode;
+  variants?: StudioComponentVariant[];
+}
+
+export interface StudioAccessibilityFinding {
+  id: string;
+  severity: 'ERROR' | 'WARNING' | 'INFO';
+  nodeId?: string;
+  nodeName?: string;
+  ruleId: string;
+  message: string;
+  recommendation: string;
+}
 
 export interface StudioResponsiveOverride {
   width?: string;
@@ -145,6 +194,10 @@ export interface StudioIr {
   schema: StudioSchemaModel;
   flows: StudioFlowGraph;
   reusableComponents: { id: string; name: string; rootNode: StudioNode }[];
+  reusableComponentDefs?: StudioReusableComponentDef[];
+  prototypeVariables?: StudioPrototypeVariable[];
+  prototypeState?: Record<string, any>;
+  dataSources?: StudioDataSourceDefinition[];
 }
 
 export const DEFAULT_DESIGN_TOKENS: StudioDesignTokens = {
@@ -371,7 +424,21 @@ export function validateStudioIr(ir: any): { valid: boolean; errors: string[] } 
       'Image',
       'Divider',
       'Badge',
+      'ComponentInstance',
+      'Form',
+      'Modal',
+      'Drawer',
+      'Tabs',
+      'Accordion',
     ];
+
+    const paths = new Set<string>();
+    for (const page of ir.pages) {
+      if (paths.has(page.path)) {
+        errors.push(`Duplicate page route path detected: ${page.path}`);
+      }
+      paths.add(page.path);
+    }
 
     function validateNode(node: any, depth: number, pageId: string) {
       if (!node || typeof node !== 'object') {

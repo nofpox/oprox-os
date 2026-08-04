@@ -121,6 +121,26 @@ function compileNodeToJsx(node: StudioNode, indent: number = 4): string {
       const alt = node.props.alt || node.name;
       return `${pad}<img src="${src}" alt="${alt}"${idAttr}${classAttr}${styleAttr} />`;
     }
+    case 'Form': {
+      const onSubmitAttr = node.bindings?.onSubmitFlowId
+        ? ` onSubmit={(e) => { e.preventDefault(); handleFlowTrigger('${node.bindings.onSubmitFlowId}'); }}`
+        : ' onSubmit={(e) => e.preventDefault()}';
+      return `${pad}<form${idAttr}${classAttr}${styleAttr}${onSubmitAttr}>\n${childrenJsx}\n${pad}</form>`;
+    }
+    case 'Modal':
+    case 'Drawer': {
+      const isOpen = node.props.isOpen !== false;
+      if (!isOpen) return '';
+      return `${pad}<div role="dialog" aria-modal="true"${idAttr}${classAttr}${styleAttr}>\n${childrenJsx}\n${pad}</div>`;
+    }
+    case 'Tabs':
+    case 'Accordion': {
+      return `${pad}<div role="region"${idAttr}${classAttr}${styleAttr}>\n${childrenJsx}\n${pad}</div>`;
+    }
+    case 'ComponentInstance': {
+      const compName = node.props.componentName || 'CustomComponent';
+      return `${pad}<div data-studio-instance="${node.props.componentId || ''}"${idAttr}${classAttr}${styleAttr}>\n${pad}  {/* Instance of ${compName} */}\n${childrenJsx}\n${pad}</div>`;
+    }
     case 'Card':
     case 'Section':
     case 'Container':
@@ -157,7 +177,9 @@ export const ${componentName}: React.FC = () => {
   };
 
   return (
+    /* @studio-managed-start */
 ${bodyJsx}
+    /* @studio-managed-end */
   );
 };
 

@@ -322,7 +322,7 @@ export const StudioAppSuite: React.FC = () => {
             <h1 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
               <span>{projectName}</span>
               <span className="text-xs px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
-                Studio Phase 1
+                Studio Phase 2
               </span>
             </h1>
             <p className="text-xs text-slate-400">Low-Code Visual Application Builder</p>

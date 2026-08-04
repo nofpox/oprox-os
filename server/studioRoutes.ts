@@ -214,4 +214,122 @@ router.post('/api/studio/projects/:id/simulate-flow', requireAuth, async (req: A
   }
 });
 
+// 10. Phase 2 — Asset Management
+router.get('/api/studio/projects/:id/assets', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    res.json({ success: true, assets: [] });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list assets.' });
+  }
+});
+
+router.post('/api/studio/projects/:id/assets', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const userId = req.user!.id;
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const { filename, mimeType, fileSize, base64Data } = req.body;
+    const { validateAssetUpload } = await import('../src/lib/studio/studioPhase2Engine');
+    const validation = validateAssetUpload(filename || 'image.png', fileSize || 1024, mimeType || 'image/png');
+
+    if (!validation.safe) {
+      return res.status(400).json({ error: validation.reason });
+    }
+
+    const assetId = `asset_${Date.now()}`;
+    const storageUrl = `https://storage.oprox.internal/${tenantId}/${req.params.id}/${assetId}_${filename}`;
+
+    res.json({
+      success: true,
+      asset: {
+        id: assetId,
+        tenantId,
+        projectId: req.params.id,
+        filename,
+        fileType: mimeType,
+        fileSize,
+        storageUrl,
+        createdBy: userId,
+        createdAt: new Date().toISOString(),
+      },
+    });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Asset upload failed.' });
+  }
+});
+
+// 11. Phase 2 — Safe API Preview
+router.post('/api/studio/projects/:id/preview-api', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const { url, method } = req.body;
+    const { validateApiUrl } = await import('../src/lib/studio/studioPhase2Engine');
+    const urlCheck = validateApiUrl(url);
+
+    if (!urlCheck.safe) {
+      return res.status(400).json({ error: `SSRF_BLOCKED: ${urlCheck.reason}` });
+    }
+
+    res.json({
+      success: true,
+      previewResponse: {
+        status: 200,
+        statusText: 'OK',
+        data: { mockPreview: true, url, method: method || 'GET', timestamp: new Date().toISOString() },
+      },
+    });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'API Preview request failed.' });
+  }
+});
+
+// 12. Phase 2 — Design & Code Sync Check
+router.post('/api/studio/projects/:id/sync-check', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const { codeContent } = req.body;
+    const { classifyCodeRegions } = await import('../src/lib/studio/studioPhase2Engine');
+    const regions = classifyCodeRegions(codeContent || '');
+
+    const hasProtected = regions.some((r) => r.type === 'CUSTOM_PROTECTED');
+
+    res.json({
+      success: true,
+      syncStatus: hasProtected ? 'PARTIAL_IMPORT' : 'SAFE_TO_IMPORT',
+      regions,
+    });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Sync check failed.' });
+  }
+});
+
+// 13. Phase 2 — Revision Comparison / Design Diff
+router.post('/api/studio/projects/:id/revisions/compare', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const projectData = await getStudioProjectIr(req.params.id, tenantId);
+    if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
+
+    const { targetIr } = req.body;
+    const { calculateDesignDiff } = await import('../src/lib/studio/studioPhase2Engine');
+    const diff = calculateDesignDiff(projectData.ir, targetIr || projectData.ir);
+
+    res.json({ success: true, diff });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Revision comparison failed.' });
+  }
+});
+
 export default router;

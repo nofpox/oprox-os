@@ -1430,3 +1430,71 @@ export const oproxStudioPromotionsTable = pgTable(
 );
 
 export type OproxStudioPromotionRow = typeof oproxStudioPromotionsTable.$inferSelect;
+
+export const oproxStudioAssetsTable = pgTable(
+  "oprox_studio_assets",
+  {
+    id: text("id").primaryKey(), // asset_xxx
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull().references(() => oproxStudioProjectsTable.id, { onDelete: "cascade" }),
+    filename: text("filename").notNull(),
+    fileType: text("file_type").notNull(),
+    fileSize: integer("file_size").notNull(),
+    storageUrl: text("storage_url").notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("studio_assets_tenant_idx").on(t.tenantId),
+    index("studio_assets_proj_idx").on(t.projectId),
+  ]
+);
+
+export type OproxStudioAssetRow = typeof oproxStudioAssetsTable.$inferSelect;
+
+export const oproxStudioDataSourcesTable = pgTable(
+  "oprox_studio_data_sources",
+  {
+    id: text("id").primaryKey(), // ds_xxx
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull().references(() => oproxStudioProjectsTable.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    method: text("method").notNull().default("GET"),
+    url: text("url").notNull(),
+    headersJson: jsonb("headers_json").notNull().default({}),
+    paramsJson: jsonb("params_json").notNull().default({}),
+    reqSchemaJson: jsonb("req_schema_json").notNull().default({}),
+    resSchemaJson: jsonb("res_schema_json").notNull().default({}),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("studio_ds_tenant_idx").on(t.tenantId),
+    index("studio_ds_proj_idx").on(t.projectId),
+  ]
+);
+
+export type OproxStudioDataSourceRow = typeof oproxStudioDataSourcesTable.$inferSelect;
+
+export const oproxStudioSyncProvenanceTable = pgTable(
+  "oprox_studio_sync_provenance",
+  {
+    id: text("id").primaryKey(), // sync_xxx
+    tenantId: text("tenant_id").notNull(),
+    projectId: text("project_id").notNull().references(() => oproxStudioProjectsTable.id, { onDelete: "cascade" }),
+    filePath: text("file_path").notNull(),
+    regionId: text("region_id").notNull(),
+    regionType: text("region_type").notNull().default("STUDIO_MANAGED"), // STUDIO_MANAGED | CUSTOM_PROTECTED | UNSUPPORTED
+    codeHash: text("code_hash").notNull(),
+    irHash: text("ir_hash").notNull(),
+    lastSyncedAt: timestamp("last_synced_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("studio_sync_tenant_idx").on(t.tenantId),
+    index("studio_sync_proj_idx").on(t.projectId),
+    uniqueIndex("studio_sync_file_region_uniq").on(t.projectId, t.filePath, t.regionId),
+  ]
+);
+
+export type OproxStudioSyncProvenanceRow = typeof oproxStudioSyncProvenanceTable.$inferSelect;

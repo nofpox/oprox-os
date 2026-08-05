@@ -33,7 +33,9 @@ export interface SecurityAuditEvent {
     | 'ACADEMY_ADMIN_ACTION'
     | 'ACADEMY_TUTOR_SESSION_CREATED'
     | 'ACADEMY_TUTOR_INTERACTION'
-    | 'ACADEMY_MASTERY_UPDATED';
+    | 'ACADEMY_MASTERY_UPDATED'
+    | 'ACADEMY_LAB_SESSION_STARTED'
+    | 'ACADEMY_LAB_SUBMITTED';
   userId?: string;
   userRole?: string;
   orgId?: string;

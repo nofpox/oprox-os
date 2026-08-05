@@ -76,6 +76,10 @@ import {
   generateAdaptiveRecommendations,
   getAdaptiveRecommendations,
   dismissRecommendation,
+  getOrCreateLabSession,
+  getLabSession,
+  submitLabSession,
+  listLearnerLabSessions,
 } from '../src/lib/academy/academyStore';
 import { generateTutorResponse } from './geminiTutorService';
 
@@ -1838,6 +1842,120 @@ router.post('/api/academy/adaptive/mastery', requireAuth, async (req: AuthReques
   } catch (err: any) {
     logStructured('error', 'ACADEMY_ADAPTIVE_UPSERT_MASTERY_ERROR', { error: err?.message || err });
     res.status(500).json({ error: 'Failed to record concept mastery.' });
+  }
+});
+
+// ── Phase 6 Practical Lab Routes ───────────────────────────────────────────
+
+// Start or retrieve Practical Lab Session
+router.post('/api/academy/labs/session', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = getTenantId(req);
+    const userId = req.user!.id;
+    const { courseId, lessonId, labType, checkpoints } = req.body;
+
+    if (!courseId || !lessonId || !labType) {
+      return res.status(400).json({ error: 'courseId, lessonId, and labType are required.' });
+    }
+
+    if (labType !== 'CODING_LAB' && labType !== 'STUDIO_LAB') {
+      return res.status(400).json({ error: 'Invalid labType. Must be CODING_LAB or STUDIO_LAB.' });
+    }
+
+    // Verify enrollment
+    const enrollment = await getEnrollmentByCourse(tenantId, userId, courseId);
+    if (!enrollment) {
+      return res.status(403).json({ error: 'Must be enrolled in course to launch lab session.' });
+    }
+
+    const session = await getOrCreateLabSession({
+      tenantId,
+      userId,
+      courseId,
+      lessonId,
+      labType,
+      initialCheckpoints: Array.isArray(checkpoints) ? checkpoints : [],
+    });
+
+    logSecurityAudit('ACADEMY_LAB_SESSION_STARTED', req, { tenantId, userId, courseId, lessonId, labType, sessionId: session.id });
+    res.json({ success: true, session });
+  } catch (err: any) {
+    logStructured('error', 'ACADEMY_LAB_CREATE_SESSION_ERROR', { error: err?.message || err });
+    res.status(500).json({ error: 'Failed to start lab session.' });
+  }
+});
+
+// Get Practical Lab Session details (Owner + Tenant protected)
+router.get('/api/academy/labs/session/:sessionId', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = getTenantId(req);
+    const userId = req.user!.id;
+    const { sessionId } = req.params;
+
+    const session = await getLabSession(tenantId, userId, sessionId);
+    if (!session) {
+      return res.status(404).json({ error: 'Lab session not found or unauthorized.' });
+    }
+
+    res.json({ success: true, session });
+  } catch (err: any) {
+    logStructured('error', 'ACADEMY_LAB_GET_SESSION_ERROR', { error: err?.message || err });
+    res.status(500).json({ error: 'Failed to retrieve lab session.' });
+  }
+});
+
+// Submit / Complete Practical Lab
+router.post('/api/academy/labs/session/:sessionId/submit', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = getTenantId(req);
+    const userId = req.user!.id;
+    const { sessionId } = req.params;
+    const { checkpointsJson, score, feedback } = req.body;
+
+    const submitted = await submitLabSession({
+      tenantId,
+      userId,
+      sessionId,
+      checkpointsJson: typeof checkpointsJson === 'string' ? checkpointsJson : JSON.stringify(checkpointsJson || []),
+      score: Number(score) || 100,
+      feedback,
+    });
+
+    if (!submitted) {
+      return res.status(404).json({ error: 'Lab session not found or unauthorized.' });
+    }
+
+    // Auto-mark lesson completed if score >= 70
+    if (submitted.score >= 70) {
+      await recordLessonProgress({
+        tenantId,
+        userId,
+        courseId: submitted.courseId,
+        lessonId: submitted.lessonId,
+        completed: true,
+      });
+    }
+
+    logSecurityAudit('ACADEMY_LAB_SUBMITTED', req, { tenantId, userId, sessionId, score: submitted.score });
+    res.json({ success: true, session: submitted });
+  } catch (err: any) {
+    logStructured('error', 'ACADEMY_LAB_SUBMIT_ERROR', { error: err?.message || err });
+    res.status(500).json({ error: 'Failed to submit lab session.' });
+  }
+});
+
+// List learner's lab sessions
+router.get('/api/academy/labs/sessions', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = getTenantId(req);
+    const userId = req.user!.id;
+    const courseId = req.query.courseId as string;
+
+    const sessions = await listLearnerLabSessions(tenantId, userId, courseId);
+    res.json({ success: true, sessions });
+  } catch (err: any) {
+    logStructured('error', 'ACADEMY_LAB_LIST_SESSIONS_ERROR', { error: err?.message || err });
+    res.status(500).json({ error: 'Failed to list lab sessions.' });
   }
 });
 

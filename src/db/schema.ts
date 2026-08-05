@@ -3498,3 +3498,32 @@ export const academyAdaptiveRecommendationsTable = pgTable(
 );
 
 export type AcademyAdaptiveRecommendationRow = typeof academyAdaptiveRecommendationsTable.$inferSelect;
+
+export const academyLabSessionsTable = pgTable(
+  "acad_lab_sessions",
+  {
+    id: text("id").primaryKey(), // acad_lab_sess_xxx
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    courseId: text("course_id").notNull().references(() => academyCoursesTable.id, { onDelete: "cascade" }),
+    lessonId: text("lesson_id").notNull(),
+    labType: text("lab_type").notNull(), // CODING_LAB | STUDIO_LAB
+    codeProjectId: text("code_project_id"),
+    studioProjectId: text("studio_project_id"),
+    status: text("status").notNull().default("IN_PROGRESS"), // IN_PROGRESS | COMPLETED | SUBMITTED | FAILED
+    checkpointsJson: text("checkpoints_json").notNull().default("[]"),
+    score: integer("score").notNull().default(0),
+    feedback: text("feedback"),
+    startedAt: timestamp("started_at").notNull().defaultNow(),
+    completedAt: timestamp("completed_at"),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_lab_sess_tenant_idx").on(t.tenantId),
+    index("acad_lab_sess_user_idx").on(t.userId),
+    index("acad_lab_sess_course_idx").on(t.courseId),
+    index("acad_lab_sess_lesson_idx").on(t.lessonId),
+  ]
+);
+
+export type AcademyLabSessionRow = typeof academyLabSessionsTable.$inferSelect;

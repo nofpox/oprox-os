@@ -24,6 +24,7 @@ import { AssessmentRunner } from './AssessmentRunner';
 import { AssignmentRunner } from './AssignmentRunner';
 import { AcademyAiTutorView } from './AcademyAiTutorView';
 import { AcademyAdaptiveRecommendationsView } from './AcademyAdaptiveRecommendationsView';
+import { AcademyLabRunner } from './AcademyLabRunner';
 
 export interface LessonResource {
   id: string;
@@ -488,19 +489,14 @@ export const AcademyCoursePlayer: React.FC<AcademyCoursePlayerProps> = ({
               )}
 
               {(activeLesson.lessonType === 'CODING_LAB' || activeLesson.lessonType === 'STUDIO_LAB') && (
-                <div className="p-8 rounded-2xl bg-slate-900 border border-indigo-500/30 space-y-4 text-center">
-                  <div className="w-12 h-12 mx-auto rounded-full bg-indigo-500/10 text-indigo-400 flex items-center justify-center border border-indigo-500/20">
-                    <Code className="w-6 h-6" />
-                  </div>
-                  <h3 className="text-base font-bold text-white">
-                    {isRtl ? 'المختبر البرمجي والعملي (Phase 6 Lab)' : 'Interactive Practical Studio Lab'}
-                  </h3>
-                  <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-                    {isRtl
-                      ? 'هذا الدرس يتضمن بيئة مختبر عملي تفاعلية. سيتم تفعيل التشغيل الآلي للمختبرات في الموديل التالي. يمكنك استعراض المفاهيم والمتابعة.'
-                      : 'Interactive practical workspace module. Lab runner environments will connect in Phase 6.'}
-                  </p>
-                </div>
+                <AcademyLabRunner
+                  courseId={playerData.course.id}
+                  lessonId={activeLesson.id}
+                  labType={activeLesson.lessonType}
+                  lessonTitle={isRtl ? activeLesson.titleAr || activeLesson.titleEn : activeLesson.titleEn}
+                  isRtl={isRtl}
+                  onLabCompleted={handleToggleComplete}
+                />
               )}
 
               {activeLesson.lessonType === 'QUIZ' && (

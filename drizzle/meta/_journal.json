@@ -162,6 +162,13 @@
       "when": 1785930000000,
       "tag": "0022_oprox_academy_phase5_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1785940000000,
+      "tag": "0023_oprox_academy_phase6_tables",
+      "breakpoints": true
     }
   ]
 }

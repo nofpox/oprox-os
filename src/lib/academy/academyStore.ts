@@ -60,10 +60,12 @@ import {
   academyTutorMessagesTable,
   academyLearnerMasteryTable,
   academyAdaptiveRecommendationsTable,
+  academyLabSessionsTable,
   AcademyTutorSessionRow,
   AcademyTutorMessageRow,
   AcademyLearnerMasteryRow,
   AcademyAdaptiveRecommendationRow,
+  AcademyLabSessionRow,
 } from '../../db/schema';
 import { eq, and, desc, asc, sql } from 'drizzle-orm';
 import { logStructured } from '../logger';
@@ -108,6 +110,9 @@ const memoryTutorMessages: AcademyTutorMessageRow[] = [];
 const memoryLearnerMastery: AcademyLearnerMasteryRow[] = [];
 const memoryAdaptiveRecommendations: AcademyAdaptiveRecommendationRow[] = [];
 
+// Phase 6 Memory Fallbacks
+const memoryLabSessions: AcademyLabSessionRow[] = [];
+
 
 export function clearAcademyMemoryStore(): void {
   memoryProfiles.length = 0;
@@ -142,6 +147,7 @@ export function clearAcademyMemoryStore(): void {
   memoryTutorMessages.length = 0;
   memoryLearnerMastery.length = 0;
   memoryAdaptiveRecommendations.length = 0;
+  memoryLabSessions.length = 0;
 }
 
 // ── Profiles ───────────────────────────────────────────────────────────────
@@ -3522,4 +3528,198 @@ export async function dismissRecommendation(
     return true;
   }
   return false;
+}
+
+// ── Phase 6 Practical Labs ──────────────────────────────────────────────────
+
+export async function getOrCreateLabSession(params: {
+  tenantId: string;
+  userId: string;
+  courseId: string;
+  lessonId: string;
+  labType: 'CODING_LAB' | 'STUDIO_LAB';
+  initialCheckpoints?: string[];
+}): Promise<AcademyLabSessionRow> {
+  const { tenantId, userId, courseId, lessonId, labType, initialCheckpoints = [] } = params;
+
+  if (db) {
+    try {
+      const existing = await db
+        .select()
+        .from(academyLabSessionsTable)
+        .where(
+          and(
+            eq(academyLabSessionsTable.tenantId, tenantId),
+            eq(academyLabSessionsTable.userId, userId),
+            eq(academyLabSessionsTable.lessonId, lessonId)
+          )
+        );
+      if (existing.length > 0) return existing[0];
+
+      const newId = `acad_lab_sess_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const defaultCheckpointsJson = JSON.stringify(
+        initialCheckpoints.map((cp, idx) => ({ id: `cp_${idx + 1}`, label: cp, status: 'PENDING' }))
+      );
+
+      const [created] = await db
+        .insert(academyLabSessionsTable)
+        .values({
+          id: newId,
+          tenantId,
+          userId,
+          courseId,
+          lessonId,
+          labType,
+          codeProjectId: labType === 'CODING_LAB' ? `code_proj_${lessonId}` : null,
+          studioProjectId: labType === 'STUDIO_LAB' ? `studio_proj_${lessonId}` : null,
+          status: 'IN_PROGRESS',
+          checkpointsJson: defaultCheckpointsJson,
+          score: 0,
+        })
+        .returning();
+      return created;
+    } catch (err) {
+      logStructured('warn', 'ACADEMY_DB_CREATE_LAB_SESSION_FALLBACK', { error: String(err) });
+    }
+  }
+
+  const memExisting = memoryLabSessions.find(
+    (s) => s.tenantId === tenantId && s.userId === userId && s.lessonId === lessonId
+  );
+  if (memExisting) return memExisting;
+
+  const defaultCheckpointsJson = JSON.stringify(
+    initialCheckpoints.map((cp, idx) => ({ id: `cp_${idx + 1}`, label: cp, status: 'PENDING' }))
+  );
+
+  const newSession: AcademyLabSessionRow = {
+    id: `acad_lab_sess_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    tenantId,
+    userId,
+    courseId,
+    lessonId,
+    labType,
+    codeProjectId: labType === 'CODING_LAB' ? `code_proj_${lessonId}` : null,
+    studioProjectId: labType === 'STUDIO_LAB' ? `studio_proj_${lessonId}` : null,
+    status: 'IN_PROGRESS',
+    checkpointsJson: defaultCheckpointsJson,
+    score: 0,
+    feedback: null,
+    startedAt: new Date(),
+    completedAt: null,
+    updatedAt: new Date(),
+  };
+
+  memoryLabSessions.push(newSession);
+  return newSession;
+}
+
+export async function getLabSession(
+  tenantId: string,
+  userId: string,
+  sessionId: string
+): Promise<AcademyLabSessionRow | null> {
+  if (db) {
+    try {
+      const res = await db
+        .select()
+        .from(academyLabSessionsTable)
+        .where(
+          and(
+            eq(academyLabSessionsTable.tenantId, tenantId),
+            eq(academyLabSessionsTable.userId, userId),
+            eq(academyLabSessionsTable.id, sessionId)
+          )
+        );
+      if (res.length > 0) return res[0];
+    } catch (err) {
+      logStructured('warn', 'ACADEMY_DB_GET_LAB_SESSION_FALLBACK', { error: String(err) });
+    }
+  }
+
+  return (
+    memoryLabSessions.find(
+      (s) => s.tenantId === tenantId && s.userId === userId && s.id === sessionId
+    ) || null
+  );
+}
+
+export async function submitLabSession(params: {
+  tenantId: string;
+  userId: string;
+  sessionId: string;
+  checkpointsJson?: string;
+  score?: number;
+  feedback?: string;
+}): Promise<AcademyLabSessionRow | null> {
+  const { tenantId, userId, sessionId, checkpointsJson, score = 100, feedback } = params;
+
+  if (db) {
+    try {
+      const [updated] = await db
+        .update(academyLabSessionsTable)
+        .set({
+          status: 'COMPLETED',
+          score,
+          feedback: feedback || 'Lab checkpoints successfully verified.',
+          checkpointsJson: checkpointsJson || undefined,
+          completedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(academyLabSessionsTable.tenantId, tenantId),
+            eq(academyLabSessionsTable.userId, userId),
+            eq(academyLabSessionsTable.id, sessionId)
+          )
+        )
+        .returning();
+      if (updated) return updated;
+    } catch (err) {
+      logStructured('warn', 'ACADEMY_DB_SUBMIT_LAB_SESSION_FALLBACK', { error: String(err) });
+    }
+  }
+
+  const session = memoryLabSessions.find(
+    (s) => s.tenantId === tenantId && s.userId === userId && s.id === sessionId
+  );
+  if (session) {
+    session.status = 'COMPLETED';
+    session.score = score;
+    session.feedback = feedback || 'Lab checkpoints successfully verified.';
+    if (checkpointsJson) session.checkpointsJson = checkpointsJson;
+    session.completedAt = new Date();
+    session.updatedAt = new Date();
+    return session;
+  }
+  return null;
+}
+
+export async function listLearnerLabSessions(
+  tenantId: string,
+  userId: string,
+  courseId?: string
+): Promise<AcademyLabSessionRow[]> {
+  if (db) {
+    try {
+      const conditions = [
+        eq(academyLabSessionsTable.tenantId, tenantId),
+        eq(academyLabSessionsTable.userId, userId),
+      ];
+      if (courseId) {
+        conditions.push(eq(academyLabSessionsTable.courseId, courseId));
+      }
+      return await db
+        .select()
+        .from(academyLabSessionsTable)
+        .where(and(...conditions))
+        .orderBy(desc(academyLabSessionsTable.updatedAt));
+    } catch (err) {
+      logStructured('warn', 'ACADEMY_DB_LIST_LAB_SESSIONS_FALLBACK', { error: String(err) });
+    }
+  }
+
+  return memoryLabSessions
+    .filter((s) => s.tenantId === tenantId && s.userId === userId && (!courseId || s.courseId === courseId))
+    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 }

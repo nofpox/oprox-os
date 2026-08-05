@@ -2953,3 +2953,104 @@ export const academyEnrollmentsTable = pgTable(
 );
 
 export type AcademyEnrollmentRow = typeof academyEnrollmentsTable.$inferSelect;
+
+// ── OPROX Academy Phase 2 Tables ───────────────────────────────────────────
+
+export const academyLessonProgressTable = pgTable(
+  "acad_lesson_progress",
+  {
+    id: text("id").primaryKey(), // acad_lprog_xxx
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    enrollmentId: text("enrollment_id").notNull().references(() => academyEnrollmentsTable.id, { onDelete: "cascade" }),
+    courseId: text("course_id").notNull().references(() => academyCoursesTable.id, { onDelete: "cascade" }),
+    lessonId: text("lesson_id").notNull().references(() => academyLessonsTable.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("IN_PROGRESS"), // NOT_STARTED | IN_PROGRESS | COMPLETED
+    completedAt: timestamp("completed_at"),
+    lastPositionSeconds: integer("last_position_seconds").notNull().default(0),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_lprog_tenant_idx").on(t.tenantId),
+    index("acad_lprog_user_idx").on(t.userId),
+    index("acad_lprog_enr_idx").on(t.enrollmentId),
+    index("acad_lprog_crs_idx").on(t.courseId),
+    index("acad_lprog_lsn_idx").on(t.lessonId),
+    uniqueIndex("acad_lprog_tenant_user_lsn_uniq").on(t.tenantId, t.userId, t.lessonId),
+  ]
+);
+
+export type AcademyLessonProgressRow = typeof academyLessonProgressTable.$inferSelect;
+
+export const academyCourseProgressTable = pgTable(
+  "acad_course_progress",
+  {
+    id: text("id").primaryKey(), // acad_cprog_xxx
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    enrollmentId: text("enrollment_id").notNull().references(() => academyEnrollmentsTable.id, { onDelete: "cascade" }),
+    courseId: text("course_id").notNull().references(() => academyCoursesTable.id, { onDelete: "cascade" }),
+    completedLessonsCount: integer("completed_lessons_count").notNull().default(0),
+    totalLessonsCount: integer("total_lessons_count").notNull().default(0),
+    progressPercent: integer("progress_percent").notNull().default(0),
+    lastLessonId: text("last_lesson_id").references(() => academyLessonsTable.id, { onDelete: "set null" }),
+    status: text("status").notNull().default("IN_PROGRESS"), // IN_PROGRESS | COMPLETED
+    startedAt: timestamp("started_at").notNull().defaultNow(),
+    lastAccessedAt: timestamp("last_accessed_at").notNull().defaultNow(),
+    completedAt: timestamp("completed_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_cprog_tenant_idx").on(t.tenantId),
+    index("acad_cprog_user_idx").on(t.userId),
+    index("acad_cprog_enr_idx").on(t.enrollmentId),
+    index("acad_cprog_crs_idx").on(t.courseId),
+    uniqueIndex("acad_cprog_tenant_user_crs_uniq").on(t.tenantId, t.userId, t.courseId),
+  ]
+);
+
+export type AcademyCourseProgressRow = typeof academyCourseProgressTable.$inferSelect;
+
+export const academyLearningSessionsTable = pgTable(
+  "acad_learning_sessions",
+  {
+    id: text("id").primaryKey(), // acad_sess_xxx
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    courseId: text("course_id").notNull().references(() => academyCoursesTable.id, { onDelete: "cascade" }),
+    lessonId: text("lesson_id").references(() => academyLessonsTable.id, { onDelete: "set null" }),
+    durationMinutes: integer("duration_minutes").notNull().default(0),
+    activityType: text("activity_type").notNull().default("LESSON_VIEW"), // LESSON_VIEW | LESSON_COMPLETE | RESOURCE_DOWNLOAD
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_sess_tenant_idx").on(t.tenantId),
+    index("acad_sess_user_idx").on(t.userId),
+    index("acad_sess_crs_idx").on(t.courseId),
+  ]
+);
+
+export type AcademyLearningSessionRow = typeof academyLearningSessionsTable.$inferSelect;
+
+export const academyBookmarksTable = pgTable(
+  "acad_bookmarks",
+  {
+    id: text("id").primaryKey(), // acad_bm_xxx
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    courseId: text("course_id").notNull().references(() => academyCoursesTable.id, { onDelete: "cascade" }),
+    lessonId: text("lesson_id").notNull().references(() => academyLessonsTable.id, { onDelete: "cascade" }),
+    note: text("note"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_bm_tenant_idx").on(t.tenantId),
+    index("acad_bm_user_idx").on(t.userId),
+    uniqueIndex("acad_bm_tenant_user_lsn_uniq").on(t.tenantId, t.userId, t.lessonId),
+  ]
+);
+
+export type AcademyBookmarkRow = typeof academyBookmarksTable.$inferSelect;

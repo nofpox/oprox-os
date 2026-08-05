@@ -20,8 +20,12 @@ import {
   FolderTree,
   AlertCircle,
   X,
-  Play
+  Play,
+  TrendingUp,
+  Activity,
+  ArrowRight
 } from 'lucide-react';
+import { AcademyCoursePlayer } from './AcademyCoursePlayer';
 
 export interface AcademyCourse {
   id: string;
@@ -123,6 +127,8 @@ export const OproxAcademyWorkspace: React.FC = () => {
   const [categories, setCategories] = useState<AcademyCategory[]>([]);
   const [learningPaths, setLearningPaths] = useState<AcademyLearningPath[]>([]);
   const [myEnrollments, setMyEnrollments] = useState<AcademyEnrollment[]>([]);
+  const [dashboardSummary, setDashboardSummary] = useState<any>(null);
+  const [activePlayerCourseId, setActivePlayerCourseId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Course Detail Modal
@@ -147,11 +153,12 @@ export const OproxAcademyWorkspace: React.FC = () => {
       if (selectedLevel !== 'ALL') params.set('level', selectedLevel);
       if (selectedLanguage !== 'ALL') params.set('language', selectedLanguage);
 
-      const [crsRes, catRes, pathRes, enrRes] = await Promise.all([
+      const [crsRes, catRes, pathRes, enrRes, dashRes] = await Promise.all([
         fetch(`/api/academy/courses?${params.toString()}`),
         fetch('/api/academy/categories'),
         fetch('/api/academy/learning-paths'),
         fetch('/api/academy/enrollments/me'),
+        fetch('/api/academy/dashboard/summary'),
       ]);
 
       if (crsRes.ok) {
@@ -169,6 +176,10 @@ export const OproxAcademyWorkspace: React.FC = () => {
       if (enrRes.ok) {
         const enrData = await enrRes.json();
         setMyEnrollments(enrData.enrollments || []);
+      }
+      if (dashRes.ok) {
+        const dashData = await dashRes.json();
+        setDashboardSummary(dashData.summary || null);
       }
     } catch (err) {
       console.error('Failed to load Academy data:', err);
@@ -510,7 +521,82 @@ export const OproxAcademyWorkspace: React.FC = () => {
 
       {/* MY LEARNING TAB */}
       {activeTab === 'my-learning' && (
-        <div className="space-y-6">
+        <div className="space-y-8">
+          {/* Learner Dashboard Key Metrics */}
+          {dashboardSummary && dashboardSummary.stats && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1">
+                <div className="flex items-center justify-between text-slate-400 text-xs">
+                  <span>{isRtl ? 'إجمالي التسجيلات' : 'Enrolled Courses'}</span>
+                  <BookOpen className="w-4 h-4 text-cyan-400" />
+                </div>
+                <div className="text-2xl font-extrabold text-white">
+                  {dashboardSummary.stats.totalEnrolled}
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1">
+                <div className="flex items-center justify-between text-slate-400 text-xs">
+                  <span>{isRtl ? 'قيد المتابعة' : 'In Progress'}</span>
+                  <Clock className="w-4 h-4 text-amber-400" />
+                </div>
+                <div className="text-2xl font-extrabold text-amber-400">
+                  {dashboardSummary.stats.inProgressCount}
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1">
+                <div className="flex items-center justify-between text-slate-400 text-xs">
+                  <span>{isRtl ? 'الدورات المكتملة' : 'Completed'}</span>
+                  <Award className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div className="text-2xl font-extrabold text-emerald-400">
+                  {dashboardSummary.stats.completedCount}
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1">
+                <div className="flex items-center justify-between text-slate-400 text-xs">
+                  <span>{isRtl ? 'متوسط التقدم' : 'Average Progress'}</span>
+                  <TrendingUp className="w-4 h-4 text-indigo-400" />
+                </div>
+                <div className="text-2xl font-extrabold text-indigo-400">
+                  {dashboardSummary.stats.averageProgress}%
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Continue Learning Quick-Action Banner */}
+          {dashboardSummary?.continueLearning && (
+            <div className="p-6 rounded-2xl bg-gradient-to-r from-indigo-950 via-slate-900 to-slate-900 border border-indigo-500/30 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl">
+              <div className="space-y-2 max-w-xl">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-[11px] font-bold">
+                  <Play className="w-3.5 h-3.5" />
+                  <span>{isRtl ? 'واصل التعلم الآن' : 'CONTINUE LEARNING'}</span>
+                </div>
+                <h3 className="text-lg font-extrabold text-white">
+                  {dashboardSummary.continueLearning.course
+                    ? isRtl
+                      ? dashboardSummary.continueLearning.course.titleAr || dashboardSummary.continueLearning.course.titleEn
+                      : dashboardSummary.continueLearning.course.titleEn
+                    : 'Course'}
+                </h3>
+                <div className="flex items-center gap-3 text-xs text-slate-400">
+                  <span>{isRtl ? 'الإنجاز الحالي:' : 'Current Progress:'} <strong className="text-emerald-400">{dashboardSummary.continueLearning.progressPercent}%</strong></span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setActivePlayerCourseId(dashboardSummary.continueLearning.courseId)}
+                className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-extrabold text-xs shadow-lg transition-all flex items-center justify-center gap-2 self-start md:self-auto"
+              >
+                <Play className="w-4 h-4 fill-current" />
+                <span>{isRtl ? 'فتح مشغّل الدورة' : 'Launch Learning Player'}</span>
+              </button>
+            </div>
+          )}
+
           {myEnrollments.length === 0 ? (
             <div className="p-12 text-center bg-slate-900/50 rounded-2xl border border-slate-800/80 space-y-4 max-w-xl mx-auto">
               <div className="w-12 h-12 mx-auto rounded-full bg-slate-800 flex items-center justify-center text-slate-400">
@@ -532,55 +618,90 @@ export const OproxAcademyWorkspace: React.FC = () => {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {myEnrollments.map((enr) => (
-                <div
-                  key={enr.id}
-                  className="rounded-2xl bg-slate-900/90 border border-slate-800 p-5 space-y-4 hover:border-emerald-500/40 transition-all"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-semibold">
-                      {enr.status}
-                    </span>
-                    <span className="text-[11px] text-slate-400">
-                      {isRtl ? 'تاريخ التسجيل: ' : 'Enrolled: '}
-                      {new Date(enr.enrolledAt).toLocaleDateString()}
-                    </span>
-                  </div>
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-emerald-400" />
+                <span>{isRtl ? 'جميع الدورات المسجل بها' : 'All Enrolled Courses'}</span>
+              </h3>
 
-                  <h4 className="text-base font-bold text-white">
-                    {enr.course
-                      ? isRtl
-                        ? enr.course.titleAr || enr.course.titleEn
-                        : enr.course.titleEn
-                      : enr.courseId}
-                  </h4>
-
-                  {/* Progress Bar */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-[11px] text-slate-400">
-                      <span>{isRtl ? 'نسبة الإنجاز' : 'Progress'}</span>
-                      <span className="font-bold text-emerald-400">{enr.progressPercent}%</span>
-                    </div>
-                    <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="bg-emerald-500 h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${enr.progressPercent}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => openCourseDetail(enr.courseId)}
-                    className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition-all"
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {myEnrollments.map((enr) => (
+                  <div
+                    key={enr.id}
+                    className="rounded-2xl bg-slate-900/90 border border-slate-800 p-5 space-y-4 hover:border-emerald-500/40 transition-all flex flex-col justify-between"
                   >
-                    {isRtl ? 'متابعة التعلم' : 'Continue Course'}
-                  </button>
-                </div>
-              ))}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-semibold">
+                          {enr.status}
+                        </span>
+                        <span className="text-[11px] text-slate-400">
+                          {isRtl ? 'مسجل: ' : 'Enrolled: '}
+                          {new Date(enr.enrolledAt).toLocaleDateString()}
+                        </span>
+                      </div>
+
+                      <h4 className="text-base font-bold text-white line-clamp-2">
+                        {enr.course
+                          ? isRtl
+                            ? enr.course.titleAr || enr.course.titleEn
+                            : enr.course.titleEn
+                          : enr.courseId}
+                      </h4>
+
+                      {/* Progress Bar */}
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-[11px] text-slate-400">
+                          <span>{isRtl ? 'نسبة الإنجاز' : 'Progress'}</span>
+                          <span className="font-bold text-emerald-400">{enr.progressPercent}%</span>
+                        </div>
+                        <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                          <div
+                            className="bg-emerald-500 h-2 rounded-full transition-all duration-500"
+                            style={{ width: `${enr.progressPercent}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-800/80 flex items-center gap-2">
+                      <button
+                        onClick={() => setActivePlayerCourseId(enr.courseId)}
+                        className="flex-1 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-md"
+                      >
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                        <span>{isRtl ? 'تشغيل الدورة' : 'Start Player'}</span>
+                      </button>
+
+                      <button
+                        onClick={() => openCourseDetail(enr.courseId)}
+                        className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all"
+                        title={isRtl ? 'تفاصيل المنهج' : 'Syllabus Details'}
+                      >
+                        <FolderTree className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
+      )}
+
+      {/* FULLSCREEN COURSE PLAYER MODAL */}
+      {activePlayerCourseId && (
+        <AcademyCoursePlayer
+          courseId={activePlayerCourseId}
+          lang={lang}
+          onClose={() => {
+            setActivePlayerCourseId(null);
+            fetchAcademyData();
+          }}
+          onProgressUpdated={() => {
+            fetchAcademyData();
+          }}
+        />
       )}
 
       {/* COURSE DETAIL MODAL */}

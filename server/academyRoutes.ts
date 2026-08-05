@@ -24,6 +24,12 @@ import {
   listLessonResources,
   enrollUserInCourse,
   getUserEnrollments,
+  getEnrollmentByCourse,
+  recordLessonProgress,
+  getCourseProgress,
+  toggleBookmark,
+  getUserBookmarks,
+  getLearnerDashboardSummary,
 } from '../src/lib/academy/academyStore';
 
 const router = Router();
@@ -222,6 +228,159 @@ router.get('/api/academy/enrollments/me', requireAuth, async (req: AuthRequest, 
   } catch (err: any) {
     logStructured('error', 'ACADEMY_GET_ENROLLMENTS_ERROR', { error: err?.message || err });
     res.status(500).json({ error: 'Failed to retrieve enrollments.' });
+  }
+});
+
+// ── Course Player & Learner Progress Endpoints (Phase 2) ───────────────────
+
+// Get Course Player Full Package (Course details + Learner Progress)
+router.get('/api/academy/player/courses/:courseId', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = getTenantId(req);
+    const userId = req.user!.id;
+    const courseId = req.params.courseId;
+
+    // Check enrollment ownership
+    const enrollment = await getEnrollmentByCourse(tenantId, userId, courseId);
+    if (!enrollment) {
+      return res.status(403).json({
+        error: 'ENROLLMENT_REQUIRED',
+        message: 'You must be enrolled in this course to access the course player.',
+      });
+    }
+
+    const courseData = await getCourseBySlugOrId(tenantId, courseId);
+    if (!courseData) {
+      return res.status(404).json({ error: 'Course not found.' });
+    }
+
+    const progress = await getCourseProgress(tenantId, userId, courseData.course.id);
+    const bookmarks = await getUserBookmarks(tenantId, userId, courseData.course.id);
+
+    res.json({
+      success: true,
+      enrollment,
+      course: courseData.course,
+      category: (courseData as any).category || null,
+      instructor: courseData.instructor,
+      modules: courseData.modules,
+      progress,
+      bookmarks,
+    });
+  } catch (err: any) {
+    logStructured('error', 'ACADEMY_PLAYER_GET_COURSE_ERROR', { error: err?.message || err });
+    res.status(500).json({ error: 'Failed to load course player details.' });
+  }
+});
+
+// Get Course Progress Only
+router.get('/api/academy/player/courses/:courseId/progress', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = getTenantId(req);
+    const userId = req.user!.id;
+    const courseId = req.params.courseId;
+
+    const enrollment = await getEnrollmentByCourse(tenantId, userId, courseId);
+    if (!enrollment) {
+      return res.status(403).json({
+        error: 'ENROLLMENT_REQUIRED',
+        message: 'You must be enrolled in this course to view progress.',
+      });
+    }
+
+    const progress = await getCourseProgress(tenantId, userId, courseId);
+    res.json({ success: true, progress });
+  } catch (err: any) {
+    logStructured('error', 'ACADEMY_GET_PROGRESS_ERROR', { error: err?.message || err });
+    res.status(500).json({ error: 'Failed to retrieve course progress.' });
+  }
+});
+
+// Record Lesson Progress (Mark complete or update playback position)
+router.post('/api/academy/player/lessons/:lessonId/progress', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = getTenantId(req);
+    const userId = req.user!.id;
+    const lessonId = req.params.lessonId;
+    const { courseId, completed, lastPositionSeconds, notes } = req.body;
+
+    if (!courseId) {
+      return res.status(400).json({ error: 'courseId is required.' });
+    }
+
+    const result = await recordLessonProgress({
+      tenantId,
+      userId,
+      courseId,
+      lessonId,
+      completed,
+      lastPositionSeconds: typeof lastPositionSeconds === 'number' ? lastPositionSeconds : undefined,
+      notes: typeof notes === 'string' ? notes : undefined,
+    });
+
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, {
+      action: 'ACADEMY_RECORD_LESSON_PROGRESS',
+      courseId,
+      lessonId,
+      completed,
+      userId,
+    });
+
+    res.json({
+      success: true,
+      lessonProgress: result.lessonProgress,
+      courseProgress: result.courseProgress,
+      enrollment: result.enrollment,
+    });
+  } catch (err: any) {
+    logStructured('error', 'ACADEMY_RECORD_PROGRESS_ERROR', { error: err?.message || err });
+
+    if (err?.message?.startsWith('NOT_ENROLLED')) {
+      return res.status(403).json({ error: 'ENROLLMENT_REQUIRED', message: err.message });
+    }
+    if (err?.message?.startsWith('COURSE_NOT_FOUND') || err?.message?.startsWith('LESSON_NOT_FOUND')) {
+      return res.status(404).json({ error: err.message });
+    }
+
+    res.status(500).json({ error: 'Failed to update lesson progress.' });
+  }
+});
+
+// Toggle Lesson Bookmark
+router.post('/api/academy/player/lessons/:lessonId/bookmark', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = getTenantId(req);
+    const userId = req.user!.id;
+    const lessonId = req.params.lessonId;
+    const { courseId, note } = req.body;
+
+    if (!courseId) {
+      return res.status(400).json({ error: 'courseId is required.' });
+    }
+
+    const result = await toggleBookmark(tenantId, userId, courseId, lessonId, note);
+    res.json({
+      success: true,
+      bookmarked: result.bookmarked,
+      bookmark: result.bookmark,
+    });
+  } catch (err: any) {
+    logStructured('error', 'ACADEMY_TOGGLE_BOOKMARK_ERROR', { error: err?.message || err });
+    res.status(500).json({ error: 'Failed to toggle bookmark.' });
+  }
+});
+
+// Learner Dashboard Summary
+router.get('/api/academy/dashboard/summary', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = getTenantId(req);
+    const userId = req.user!.id;
+
+    const summary = await getLearnerDashboardSummary(tenantId, userId);
+    res.json({ success: true, summary });
+  } catch (err: any) {
+    logStructured('error', 'ACADEMY_DASHBOARD_SUMMARY_ERROR', { error: err?.message || err });
+    res.status(500).json({ error: 'Failed to retrieve learner dashboard summary.' });
   }
 });
 

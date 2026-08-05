@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Command, Terminal, Database, Cloud, Sparkles, Layers, Sliders, Moon, Sun, Plus, ArrowRight, X } from 'lucide-react';
+import { Search, Command, Terminal, Database, Cloud, Sparkles, Layers, Sliders, Moon, Sun, Plus, ArrowRight, X, GraduationCap } from 'lucide-react';
 import { AppMode } from '../../types';
 
 interface CommandPaletteModalProps {
@@ -69,6 +69,17 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
       icon: <Layers className="w-4 h-4 text-cyan-400" />,
       action: () => {
         onNavigateMode('dashboard');
+        onClose();
+      },
+    },
+    {
+      id: 'cmd-academy',
+      category: 'Navigation',
+      label: 'Open OPROX Academy',
+      shortcut: 'Ctrl+Shift+M',
+      icon: <GraduationCap className="w-4 h-4 text-cyan-400" />,
+      action: () => {
+        onNavigateMode('academy');
         onClose();
       },
     },

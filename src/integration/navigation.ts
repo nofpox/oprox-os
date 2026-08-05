@@ -32,6 +32,15 @@ export const OPROX_ROUTES: RouteDefinition[] = [
     requiresAuth: false
   },
   {
+    path: '/academy',
+    mode: 'academy',
+    category: 'Education & Learning',
+    label: 'OPROX Academy',
+    description: 'Technical course catalog, structured learning paths, and certifications.',
+    iconName: 'GraduationCap',
+    requiresAuth: false
+  },
+  {
     path: '/platform-suite',
     mode: 'platform-suite',
     category: 'Platform Operations',

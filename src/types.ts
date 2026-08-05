@@ -1,6 +1,6 @@
 // Global OPROX Types
 
-export type AppMode = 'dashboard' | 'oprox-code-ai' | 'studio' | 'real-estate' | 'solutions' | 'platform-suite' | 'ai-os' | 'ide' | 'design-system' | 'showcase' | 'database' | 'cloud' | 'enterprise' | 'media' | 'proptech';
+export type AppMode = 'dashboard' | 'oprox-code-ai' | 'studio' | 'real-estate' | 'academy' | 'solutions' | 'platform-suite' | 'ai-os' | 'ide' | 'design-system' | 'showcase' | 'database' | 'cloud' | 'enterprise' | 'media' | 'proptech';
 
 export type SolutionCategory = 'Media & Content' | 'Real Estate & PropTech' | 'Property Management' | 'Enterprise ERP' | 'FinTech & Billing' | 'AI & Automation' | 'Developer Tools';
 

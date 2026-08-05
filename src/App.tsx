@@ -11,6 +11,7 @@ import { EnterpriseOS } from './components/memory/EnterpriseOS';
 import { MediaStudio } from './components/verticals/MediaStudio';
 import { PropTechStudio } from './components/verticals/PropTechStudio';
 import { OproxRealEstateWorkspace } from './components/realestate/OproxRealEstateWorkspace';
+import { OproxAcademyWorkspace } from './components/academy/OproxAcademyWorkspace';
 import { SolutionsPlatform } from './components/solutions/SolutionsPlatform';
 import { PlatformHub } from './components/platform/PlatformHub';
 import { DesignSystemView } from './components/design/DesignSystemView';
@@ -135,6 +136,8 @@ export default function App() {
           {currentMode === 'media' && <MediaStudio />}
 
           {(currentMode === 'real-estate' || currentMode === 'proptech') && <OproxRealEstateWorkspace />}
+
+          {currentMode === 'academy' && <OproxAcademyWorkspace />}
         </ErrorBoundary>
       </main>
 

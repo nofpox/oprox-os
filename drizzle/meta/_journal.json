@@ -127,6 +127,13 @@
       "when": 1785880000000,
       "tag": "0017_oprox_real_estate_phase6_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1785890000000,
+      "tag": "0018_oprox_academy_phase1_tables",
+      "breakpoints": true
     }
   ]
 }

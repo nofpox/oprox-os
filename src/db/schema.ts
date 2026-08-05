@@ -2721,3 +2721,235 @@ export const realEstateVRARLogsTable = pgTable(
 );
 
 export type RealEstateVRARLogRow = typeof realEstateVRARLogsTable.$inferSelect;
+
+// ── OPROX Academy Phase 1 Tables ───────────────────────────────────────────
+
+export const academyProfilesTable = pgTable(
+  "acad_profiles",
+  {
+    id: text("id").primaryKey(), // acad_prof_xxx
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    headline: text("headline"),
+    bio: text("bio"),
+    avatarUrl: text("avatar_url"),
+    preferLanguage: text("prefer_language").notNull().default("en"), // "en" | "ar"
+    metadataJson: jsonb("metadata_json").notNull().default({}),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_prof_tenant_idx").on(t.tenantId),
+    index("acad_prof_user_idx").on(t.userId),
+    uniqueIndex("acad_prof_tenant_user_uniq").on(t.tenantId, t.userId),
+  ]
+);
+
+export type AcademyProfileRow = typeof academyProfilesTable.$inferSelect;
+
+export const instructorProfilesTable = pgTable(
+  "acad_instructor_profiles",
+  {
+    id: text("id").primaryKey(), // inst_xxx
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    bio: text("bio"),
+    expertiseAreasJson: jsonb("expertise_areas_json").notNull().default([]),
+    socialLinksJson: jsonb("social_links_json").notNull().default({}),
+    rating: numeric("rating").default("5.0"),
+    totalStudents: integer("total_students").default(0),
+    totalCourses: integer("total_courses").default(0),
+    verificationStatus: text("verification_status").notNull().default("VERIFIED"), // PENDING | VERIFIED | REJECTED
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_inst_tenant_idx").on(t.tenantId),
+    index("acad_inst_user_idx").on(t.userId),
+  ]
+);
+
+export type InstructorProfileRow = typeof instructorProfilesTable.$inferSelect;
+
+export const academyCategoriesTable = pgTable(
+  "acad_categories",
+  {
+    id: text("id").primaryKey(), // acad_cat_xxx
+    tenantId: text("tenant_id").notNull(),
+    nameEn: text("name_en").notNull(),
+    nameAr: text("name_ar").notNull(),
+    slug: text("slug").notNull(),
+    descriptionEn: text("description_en"),
+    descriptionAr: text("description_ar"),
+    icon: text("icon").default("BookOpen"),
+    displayOrder: integer("display_order").default(0),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_cat_tenant_idx").on(t.tenantId),
+    uniqueIndex("acad_cat_tenant_slug_uniq").on(t.tenantId, t.slug),
+  ]
+);
+
+export type AcademyCategoryRow = typeof academyCategoriesTable.$inferSelect;
+
+export const academyLearningPathsTable = pgTable(
+  "acad_learning_paths",
+  {
+    id: text("id").primaryKey(), // acad_path_xxx
+    tenantId: text("tenant_id").notNull(),
+    titleEn: text("title_en").notNull(),
+    titleAr: text("title_ar").notNull(),
+    slug: text("slug").notNull(),
+    descriptionEn: text("description_en"),
+    descriptionAr: text("description_ar"),
+    level: text("level").notNull().default("ALL_LEVELS"), // BEGINNER | INTERMEDIATE | ADVANCED | ALL_LEVELS
+    estimatedHours: integer("estimated_hours").default(10),
+    isPublished: boolean("is_published").notNull().default(true),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_path_tenant_idx").on(t.tenantId),
+    uniqueIndex("acad_path_tenant_slug_uniq").on(t.tenantId, t.slug),
+  ]
+);
+
+export type AcademyLearningPathRow = typeof academyLearningPathsTable.$inferSelect;
+
+export const academyCoursesTable = pgTable(
+  "acad_courses",
+  {
+    id: text("id").primaryKey(), // acad_crs_xxx
+    tenantId: text("tenant_id").notNull(),
+    categoryId: text("category_id").references(() => academyCategoriesTable.id, { onDelete: "set null" }),
+    learningPathId: text("learning_path_id").references(() => academyLearningPathsTable.id, { onDelete: "set null" }),
+    instructorId: text("instructor_id").references(() => instructorProfilesTable.id, { onDelete: "set null" }),
+    titleEn: text("title_en").notNull(),
+    titleAr: text("title_ar").notNull(),
+    slug: text("slug").notNull(),
+    summaryEn: text("summary_en"),
+    summaryAr: text("summary_ar"),
+    descriptionEn: text("description_en"),
+    descriptionAr: text("description_ar"),
+    language: text("language").notNull().default("both"), // en | ar | both
+    level: text("level").notNull().default("ALL_LEVELS"), // BEGINNER | INTERMEDIATE | ADVANCED | ALL_LEVELS
+    status: text("status").notNull().default("PUBLISHED"), // DRAFT | PUBLISHED | ARCHIVED
+    estimatedDurationMinutes: integer("estimated_duration_minutes").default(120),
+    thumbnailUrl: text("thumbnail_url"),
+    priceSar: numeric("price_sar").default("0"),
+    currency: text("currency").default("SAR"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_crs_tenant_idx").on(t.tenantId),
+    index("acad_crs_cat_idx").on(t.categoryId),
+    index("acad_crs_path_idx").on(t.learningPathId),
+    index("acad_crs_inst_idx").on(t.instructorId),
+    uniqueIndex("acad_crs_tenant_slug_uniq").on(t.tenantId, t.slug),
+  ]
+);
+
+export type AcademyCourseRow = typeof academyCoursesTable.$inferSelect;
+
+export const academyCourseModulesTable = pgTable(
+  "acad_modules",
+  {
+    id: text("id").primaryKey(), // acad_mod_xxx
+    tenantId: text("tenant_id").notNull(),
+    courseId: text("course_id").notNull().references(() => academyCoursesTable.id, { onDelete: "cascade" }),
+    titleEn: text("title_en").notNull(),
+    titleAr: text("title_ar").notNull(),
+    descriptionEn: text("description_en"),
+    descriptionAr: text("description_ar"),
+    displayOrder: integer("display_order").notNull().default(1),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_mod_tenant_idx").on(t.tenantId),
+    index("acad_mod_course_idx").on(t.courseId),
+  ]
+);
+
+export type AcademyCourseModuleRow = typeof academyCourseModulesTable.$inferSelect;
+
+export const academyLessonsTable = pgTable(
+  "acad_lessons",
+  {
+    id: text("id").primaryKey(), // acad_lsn_xxx
+    tenantId: text("tenant_id").notNull(),
+    moduleId: text("module_id").notNull().references(() => academyCourseModulesTable.id, { onDelete: "cascade" }),
+    courseId: text("course_id").notNull().references(() => academyCoursesTable.id, { onDelete: "cascade" }),
+    titleEn: text("title_en").notNull(),
+    titleAr: text("title_ar").notNull(),
+    summaryEn: text("summary_en"),
+    summaryAr: text("summary_ar"),
+    lessonType: text("lesson_type").notNull().default("TEXT"), // TEXT | VIDEO | QUIZ | CODING_LAB | STUDIO_LAB
+    contentEn: text("content_en"),
+    contentAr: text("content_ar"),
+    durationMinutes: integer("duration_minutes").default(15),
+    videoUrl: text("video_url"),
+    displayOrder: integer("display_order").notNull().default(1),
+    isPreview: boolean("is_preview").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_lsn_tenant_idx").on(t.tenantId),
+    index("acad_lsn_mod_idx").on(t.moduleId),
+    index("acad_lsn_crs_idx").on(t.courseId),
+  ]
+);
+
+export type AcademyLessonRow = typeof academyLessonsTable.$inferSelect;
+
+export const academyLessonResourcesTable = pgTable(
+  "acad_resources",
+  {
+    id: text("id").primaryKey(), // acad_res_xxx
+    tenantId: text("tenant_id").notNull(),
+    lessonId: text("lesson_id").notNull().references(() => academyLessonsTable.id, { onDelete: "cascade" }),
+    titleEn: text("title_en").notNull(),
+    titleAr: text("title_ar").notNull(),
+    resourceType: text("resource_type").notNull().default("LINK"), // LINK | FILE | CODE_SNIPPET | DOCUMENT
+    resourceUrl: text("resource_url").notNull(),
+    fileSizeBytes: integer("file_size_bytes"),
+    displayOrder: integer("display_order").notNull().default(1),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_res_tenant_idx").on(t.tenantId),
+    index("acad_res_lsn_idx").on(t.lessonId),
+  ]
+);
+
+export type AcademyLessonResourceRow = typeof academyLessonResourcesTable.$inferSelect;
+
+export const academyEnrollmentsTable = pgTable(
+  "acad_enrollments",
+  {
+    id: text("id").primaryKey(), // acad_enr_xxx
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    courseId: text("course_id").notNull().references(() => academyCoursesTable.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("ACTIVE"), // ACTIVE | COMPLETED | CANCELLED | EXPIRED
+    progressPercent: integer("progress_percent").notNull().default(0),
+    enrolledAt: timestamp("enrolled_at").notNull().defaultNow(),
+    completedAt: timestamp("completed_at"),
+    lastAccessedAt: timestamp("last_accessed_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_enr_tenant_idx").on(t.tenantId),
+    index("acad_enr_user_idx").on(t.userId),
+    index("acad_enr_crs_idx").on(t.courseId),
+    uniqueIndex("acad_enr_tenant_user_crs_uniq").on(t.tenantId, t.userId, t.courseId),
+  ]
+);
+
+export type AcademyEnrollmentRow = typeof academyEnrollmentsTable.$inferSelect;

@@ -2644,3 +2644,80 @@ export const realEstateInvestmentAnalysesTable = pgTable(
 );
 
 export type RealEstateInvestmentAnalysisRow = typeof realEstateInvestmentAnalysesTable.$inferSelect;
+
+export const realEstateImmersiveAssetsTable = pgTable(
+  "re_immersive_assets",
+  {
+    id: text("id").primaryKey(), // asset_xxx
+    tenantId: text("tenant_id").notNull(),
+    linkedEntityType: text("linked_entity_type").notNull(), // PROPERTY | UNIT | DEVELOPER_PROJECT | DESIGN_PROJECT | LISTING
+    linkedEntityId: text("linked_entity_id").notNull(),
+    assetType: text("asset_type").notNull(), // GLB | GLTF | PANORAMA_360 | VR | AR | DIGITAL_TWIN
+    title: text("title").notNull(),
+    storageReference: text("storage_reference").notNull(),
+    mimeType: text("mime_type"),
+    fileSizeBytes: integer("file_size_bytes"),
+    version: integer("version").notNull().default(1),
+    processingState: text("processing_state").notNull().default("READY"), // PENDING | READY | FAILED | NOT_CONFIGURED
+    isPublicAvailable: boolean("is_public_available").notNull().default(true),
+    metadataJson: jsonb("metadata_json"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_ia_tenant_idx").on(t.tenantId),
+    index("re_ia_linked_idx").on(t.linkedEntityType, t.linkedEntityId),
+    index("re_ia_asset_type_idx").on(t.assetType),
+  ]
+);
+
+export type RealEstateImmersiveAssetRow = typeof realEstateImmersiveAssetsTable.$inferSelect;
+
+export const realEstateDigitalTwinsTable = pgTable(
+  "re_digital_twins",
+  {
+    id: text("id").primaryKey(), // dt_xxx
+    tenantId: text("tenant_id").notNull(),
+    title: text("title").notNull(),
+    linkedEntityType: text("linked_entity_type").notNull(), // PROPERTY | UNIT | DEVELOPER_PROJECT | DESIGN_PROJECT
+    linkedEntityId: text("linked_entity_id").notNull(),
+    versionNumber: integer("version_number").notNull().default(1),
+    isCurrentVersion: boolean("is_current_version").notNull().default(true),
+    primaryModelAssetId: text("primary_model_asset_id").references(() => realEstateImmersiveAssetsTable.id, { onDelete: "set null" }),
+    floorsCount: integer("floors_count").notNull().default(1),
+    spatialMetadataJson: jsonb("spatial_metadata_json").notNull(), // floors, rooms, zones, dimensions, orientation, area, hotspots, material metadata, design references
+    designProjectId: text("design_project_id").references(() => realEstateDesignProjectsTable.id, { onDelete: "set null" }),
+    designConceptId: text("design_concept_id").references(() => realEstateDesignConceptsTable.id, { onDelete: "set null" }),
+    status: text("status").notNull().default("ACTIVE"), // DRAFT | ACTIVE | ARCHIVED
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_dt_tenant_idx").on(t.tenantId),
+    index("re_dt_linked_idx").on(t.linkedEntityType, t.linkedEntityId),
+    index("re_dt_primary_asset_idx").on(t.primaryModelAssetId),
+  ]
+);
+
+export type RealEstateDigitalTwinRow = typeof realEstateDigitalTwinsTable.$inferSelect;
+
+export const realEstateVRARLogsTable = pgTable(
+  "re_vrar_logs",
+  {
+    id: text("id").primaryKey(), // vrar_xxx
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull(),
+    sessionType: text("session_type").notNull(), // 3D_ORBIT | WALKTHROUGH | VR | AR | DIGITAL_TWIN
+    capabilityState: text("capability_state").notNull(), // SUPPORTED | UNSUPPORTED | NOT_CONFIGURED
+    deviceUserAgent: text("device_user_agent"),
+    entityId: text("entity_id"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("re_vrar_tenant_idx").on(t.tenantId),
+    index("re_vrar_user_idx").on(t.userId),
+    index("re_vrar_session_idx").on(t.sessionType),
+  ]
+);
+
+export type RealEstateVRARLogRow = typeof realEstateVRARLogsTable.$inferSelect;

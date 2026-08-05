@@ -98,11 +98,12 @@ interface DashboardMetrics {
 
 import { OproxRealEstateMarketplace } from './OproxRealEstateMarketplace';
 import { OproxRealEstatePhase5Suite } from './OproxRealEstatePhase5Suite';
+import { OproxRealEstatePhase6Suite } from './OproxRealEstatePhase6Suite';
 
 export const OproxRealEstateWorkspace: React.FC = () => {
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'portfolios' | 'properties' | 'units' | 'owners' | 'contacts' | 'tenants' | 'leases' | 'payments' | 'securityDeposits' | 'crmLeads' | 'crmViewings' | 'crmOffers' | 'crmReservations' | 'marketplace' | 'phase5Suite'
-  >('phase5Suite');
+    'overview' | 'portfolios' | 'properties' | 'units' | 'owners' | 'contacts' | 'tenants' | 'leases' | 'payments' | 'securityDeposits' | 'crmLeads' | 'crmViewings' | 'crmOffers' | 'crmReservations' | 'marketplace' | 'phase5Suite' | 'phase6Suite'
+  >('phase6Suite');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -580,10 +581,25 @@ export const OproxRealEstateWorkspace: React.FC = () => {
               : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
           }`}
         >
-          <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
-          <span>AI Design & Investment Suite (Phase 5)</span>
+          <Sparkles className="w-4 h-4 text-amber-400" />
+          <span>AI Design & Investment (Phase 5)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('phase6Suite')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            activeTab === 'phase6Suite'
+              ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30'
+              : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
+          <span>3D / VR / AR & Digital Twin (Phase 6)</span>
         </button>
       </div>
+
+      {/* PHASE 6 SUITE TAB */}
+      {activeTab === 'phase6Suite' && <OproxRealEstatePhase6Suite />}
 
       {/* PHASE 5 SUITE TAB */}
       {activeTab === 'phase5Suite' && <OproxRealEstatePhase5Suite />}

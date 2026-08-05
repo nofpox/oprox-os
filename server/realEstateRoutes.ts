@@ -141,6 +141,21 @@ import {
   compareInvestments,
   askAiInvestmentAdvisor,
 } from '../src/lib/realestate/realEstatePhase5Store';
+import {
+  createImmersiveAsset,
+  listImmersiveAssets,
+  getImmersiveAsset,
+  deleteImmersiveAsset,
+  createDigitalTwin,
+  listDigitalTwins,
+  getDigitalTwin,
+  createDigitalTwinVersion,
+  detectVRARCapability,
+  logCapabilityCheck,
+  handoffDesignToImmersive,
+  getMarketplaceImmersiveAssets,
+  auditProductBoundaryScope,
+} from '../src/lib/realestate/realEstatePhase6Store';
 
 const router = Router();
 
@@ -1788,6 +1803,192 @@ router.post('/api/real-estate/ai/investment-advisor', requireAuth, async (req: A
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || 'Failed to query AI Investment Advisor.' });
+  }
+});
+
+// ── PHASE 6 — IMMERSIVE 3D / VR / AR / DIGITAL TWIN ───────────────────────
+
+router.get('/api/real-estate/phase6/assets', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const assets = await listImmersiveAssets(tenantId, {
+      linkedEntityType: req.query.linkedEntityType as string,
+      linkedEntityId: req.query.linkedEntityId as string,
+      assetType: req.query.assetType as string,
+    });
+    res.json({ success: true, assets });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list immersive assets.' });
+  }
+});
+
+router.post('/api/real-estate/phase6/assets', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { linkedEntityType, linkedEntityId, assetType, title, storageReference, mimeType, fileSizeBytes, isPublicAvailable, metadataJson } = req.body;
+    if (!linkedEntityType || !linkedEntityId || !assetType || !title || !storageReference) {
+      return res.status(400).json({ error: 'Missing required fields: linkedEntityType, linkedEntityId, assetType, title, storageReference.' });
+    }
+
+    const asset = await createImmersiveAsset({
+      tenantId,
+      linkedEntityType,
+      linkedEntityId,
+      assetType,
+      title,
+      storageReference,
+      mimeType,
+      fileSizeBytes,
+      isPublicAvailable,
+      metadataJson,
+    });
+
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'IMMERSIVE_ASSET_CREATED', assetId: asset.id, assetType, linkedEntityId });
+
+    res.json({ success: true, asset });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to create immersive asset.' });
+  }
+});
+
+router.get('/api/real-estate/phase6/assets/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const asset = await getImmersiveAsset(tenantId, req.params.id);
+    if (!asset) return res.status(404).json({ error: 'Immersive asset not found or access denied.' });
+    res.json({ success: true, asset });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch immersive asset.' });
+  }
+});
+
+router.delete('/api/real-estate/phase6/assets/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const ok = await deleteImmersiveAsset(tenantId, req.params.id);
+    if (!ok) return res.status(404).json({ error: 'Asset not found or access denied.' });
+
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'IMMERSIVE_ASSET_DELETED', assetId: req.params.id });
+
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to delete immersive asset.' });
+  }
+});
+
+router.get('/api/real-estate/phase6/digital-twins', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const twins = await listDigitalTwins(tenantId, {
+      linkedEntityType: req.query.linkedEntityType as string,
+      linkedEntityId: req.query.linkedEntityId as string,
+      onlyCurrentVersion: req.query.allVersions === 'true' ? false : true,
+    });
+    res.json({ success: true, digitalTwins: twins });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to list Digital Twins.' });
+  }
+});
+
+router.post('/api/real-estate/phase6/digital-twins', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const { title, linkedEntityType, linkedEntityId, spatialMetadataJson, primaryModelAssetId, floorsCount, designProjectId, designConceptId } = req.body;
+    if (!title || !linkedEntityType || !linkedEntityId || !spatialMetadataJson) {
+      return res.status(400).json({ error: 'Missing required fields: title, linkedEntityType, linkedEntityId, spatialMetadataJson.' });
+    }
+
+    const dt = await createDigitalTwin({
+      tenantId,
+      title,
+      linkedEntityType,
+      linkedEntityId,
+      spatialMetadataJson,
+      primaryModelAssetId,
+      floorsCount,
+      designProjectId,
+      designConceptId,
+    });
+
+    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'DIGITAL_TWIN_CREATED', digitalTwinId: dt.id, linkedEntityId });
+
+    res.json({ success: true, digitalTwin: dt });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to create Digital Twin.' });
+  }
+});
+
+router.get('/api/real-estate/phase6/digital-twins/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const dt = await getDigitalTwin(tenantId, req.params.id);
+    if (!dt) return res.status(404).json({ error: 'Digital Twin not found or access denied.' });
+    res.json({ success: true, digitalTwin: dt });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch Digital Twin.' });
+  }
+});
+
+router.post('/api/real-estate/phase6/digital-twins/:id/version', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const updatedDt = await createDigitalTwinVersion(tenantId, req.params.id, req.body);
+    res.json({ success: true, digitalTwin: updatedDt });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to create Digital Twin version.' });
+  }
+});
+
+router.post('/api/real-estate/phase6/capability-check', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const userId = req.user!.id;
+    const { sessionType, entityId } = req.body;
+    if (!sessionType) return res.status(400).json({ error: 'Field "sessionType" is required.' });
+
+    const userAgent = (req.headers['user-agent'] as string) || '';
+    const capabilityState = await detectVRARCapability(sessionType, userAgent);
+    await logCapabilityCheck(tenantId, userId, sessionType, capabilityState, userAgent, entityId);
+
+    res.json({ success: true, sessionType, capabilityState, userAgent });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to check capability.' });
+  }
+});
+
+router.post('/api/real-estate/phase6/design-handoff', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
+    const userId = req.user!.id;
+    const { designProjectId, conceptId } = req.body;
+    if (!designProjectId || !conceptId) {
+      return res.status(400).json({ error: 'Fields "designProjectId" and "conceptId" are required.' });
+    }
+
+    const result = await handoffDesignToImmersive(tenantId, userId, designProjectId, conceptId);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed design to immersive handoff.' });
+  }
+});
+
+router.get('/api/real-estate/phase6/marketplace-assets/:entityType/:entityId', async (req, res) => {
+  try {
+    const tenantId = (req.query.tenantId as string) || 'tenant_default';
+    const { entityType, entityId } = req.params;
+    const data = await getMarketplaceImmersiveAssets(tenantId, entityType as any, entityId);
+    res.json({ success: true, ...data });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to fetch marketplace immersive assets.' });
+  }
+});
+
+router.get('/api/real-estate/phase6/boundary-audit', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const audit = auditProductBoundaryScope();
+    res.json({ success: true, audit });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to run boundary audit.' });
   }
 });
 

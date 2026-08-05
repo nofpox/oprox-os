@@ -23,10 +23,15 @@ import {
   Play,
   TrendingUp,
   Activity,
-  ArrowRight
+  ArrowRight,
+  Building2,
+  ShieldAlert,
 } from 'lucide-react';
 import { AcademyCoursePlayer } from './AcademyCoursePlayer';
 import { CertificatesView } from './CertificatesView';
+import { InstructorStudioView } from './InstructorStudioView';
+import { OrgLearningView } from './OrgLearningView';
+import { AcademyAdminView } from './AcademyAdminView';
 
 export interface AcademyCourse {
   id: string;
@@ -115,7 +120,7 @@ export interface CourseDetailPayload {
 
 export const OproxAcademyWorkspace: React.FC = () => {
   const [lang, setLang] = useState<'en' | 'ar'>('en');
-  const [activeTab, setActiveTab] = useState<'catalog' | 'paths' | 'my-learning' | 'certificates'>('catalog');
+  const [activeTab, setActiveTab] = useState<'catalog' | 'paths' | 'my-learning' | 'certificates' | 'instructor' | 'org-learning' | 'admin'>('catalog');
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -335,6 +340,42 @@ export const OproxAcademyWorkspace: React.FC = () => {
           >
             <Award className="w-4 h-4" />
             <span>{isRtl ? 'الشهادات والاعتمادات' : 'Certificates'}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('instructor')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-xl transition-all border-b-2 ${
+              activeTab === 'instructor'
+                ? 'border-purple-400 text-purple-400 bg-purple-500/10'
+                : 'border-transparent text-slate-400 hover:text-white'
+            }`}
+          >
+            <Video className="w-4 h-4" />
+            <span>{isRtl ? 'استوديو المعلم' : 'Instructor Studio'}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('org-learning')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-xl transition-all border-b-2 ${
+              activeTab === 'org-learning'
+                ? 'border-cyan-400 text-cyan-400 bg-cyan-500/10'
+                : 'border-transparent text-slate-400 hover:text-white'
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            <span>{isRtl ? 'التعلم المؤسسي' : 'Org Learning'}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('admin')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-xl transition-all border-b-2 ${
+              activeTab === 'admin'
+                ? 'border-rose-400 text-rose-400 bg-rose-500/10'
+                : 'border-transparent text-slate-400 hover:text-white'
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4" />
+            <span>{isRtl ? 'إدارة الأكاديمية' : 'Academy Admin'}</span>
           </button>
         </div>
       </div>
@@ -705,6 +746,21 @@ export const OproxAcademyWorkspace: React.FC = () => {
       {/* CERTIFICATES TAB */}
       {activeTab === 'certificates' && (
         <CertificatesView isRtl={isRtl} myEnrollments={myEnrollments} />
+      )}
+
+      {/* INSTRUCTOR STUDIO TAB */}
+      {activeTab === 'instructor' && (
+        <InstructorStudioView lang={lang} />
+      )}
+
+      {/* ORG LEARNING TAB */}
+      {activeTab === 'org-learning' && (
+        <OrgLearningView lang={lang} />
+      )}
+
+      {/* ACADEMY ADMIN TAB */}
+      {activeTab === 'admin' && (
+        <AcademyAdminView lang={lang} />
       )}
 
       {/* FULLSCREEN COURSE PLAYER MODAL */}

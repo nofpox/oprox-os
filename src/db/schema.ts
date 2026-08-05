@@ -3255,3 +3255,152 @@ export const academyCertificatesTable = pgTable(
 );
 
 export type AcademyCertificateRow = typeof academyCertificatesTable.$inferSelect;
+
+// --- Phase 4: Instructor Studio, Organization Learning & Administration Tables ---
+
+export const academyOrgProgramsTable = pgTable(
+  "acad_org_programs",
+  {
+    id: text("id").primaryKey(), // acad_prog_xxx
+    tenantId: text("tenant_id").notNull(),
+    orgId: text("org_id").notNull(),
+    titleEn: text("title_en").notNull(),
+    titleAr: text("title_ar").notNull(),
+    descriptionEn: text("description_en"),
+    descriptionAr: text("description_ar"),
+    targetAudience: text("target_audience"),
+    isPublished: boolean("is_published").notNull().default(true),
+    createdById: text("created_by_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_prog_tenant_idx").on(t.tenantId),
+    index("acad_prog_org_idx").on(t.orgId),
+  ]
+);
+
+export type AcademyOrgProgramRow = typeof academyOrgProgramsTable.$inferSelect;
+
+export const academyOrgProgramCoursesTable = pgTable(
+  "acad_org_program_courses",
+  {
+    id: text("id").primaryKey(), // acad_prog_crs_xxx
+    tenantId: text("tenant_id").notNull(),
+    programId: text("program_id").notNull().references(() => academyOrgProgramsTable.id, { onDelete: "cascade" }),
+    courseId: text("course_id").notNull().references(() => academyCoursesTable.id, { onDelete: "cascade" }),
+    orderIndex: integer("order_index").notNull().default(0),
+    isRequired: boolean("is_required").notNull().default(true),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_prog_crs_tenant_idx").on(t.tenantId),
+    index("acad_prog_crs_prog_idx").on(t.programId),
+  ]
+);
+
+export type AcademyOrgProgramCourseRow = typeof academyOrgProgramCoursesTable.$inferSelect;
+
+export const academyCohortsTable = pgTable(
+  "acad_cohorts",
+  {
+    id: text("id").primaryKey(), // acad_chrt_xxx
+    tenantId: text("tenant_id").notNull(),
+    orgId: text("org_id").notNull(),
+    nameEn: text("name_en").notNull(),
+    nameAr: text("name_ar").notNull(),
+    descriptionEn: text("description_en"),
+    descriptionAr: text("description_ar"),
+    createdById: text("created_by_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_chrt_tenant_idx").on(t.tenantId),
+    index("acad_chrt_org_idx").on(t.orgId),
+  ]
+);
+
+export type AcademyCohortRow = typeof academyCohortsTable.$inferSelect;
+
+export const academyCohortMembersTable = pgTable(
+  "acad_cohort_members",
+  {
+    id: text("id").primaryKey(), // acad_chrt_mem_xxx
+    tenantId: text("tenant_id").notNull(),
+    cohortId: text("cohort_id").notNull().references(() => academyCohortsTable.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    joinedAt: timestamp("joined_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_chrt_mem_tenant_idx").on(t.tenantId),
+    index("acad_chrt_mem_chrt_idx").on(t.cohortId),
+    index("acad_chrt_mem_user_idx").on(t.userId),
+    uniqueIndex("acad_chrt_mem_uniq").on(t.tenantId, t.cohortId, t.userId),
+  ]
+);
+
+export type AcademyCohortMemberRow = typeof academyCohortMembersTable.$inferSelect;
+
+export const academyOrgAssignmentsTable = pgTable(
+  "acad_org_assignments",
+  {
+    id: text("id").primaryKey(), // acad_org_asgn_xxx
+    tenantId: text("tenant_id").notNull(),
+    orgId: text("org_id").notNull(),
+    targetType: text("target_type").notNull().default("ORGANIZATION"), // ORGANIZATION | COHORT | USER
+    targetId: text("target_id"), // cohortId or userId or null
+    assignmentType: text("assignment_type").notNull().default("COURSE"), // COURSE | PROGRAM
+    itemCourseId: text("item_course_id").references(() => academyCoursesTable.id, { onDelete: "cascade" }),
+    itemProgramId: text("item_program_id").references(() => academyOrgProgramsTable.id, { onDelete: "cascade" }),
+    dueDate: timestamp("due_date"),
+    assignedById: text("assigned_by_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_org_asgn_tenant_idx").on(t.tenantId),
+    index("acad_org_asgn_org_idx").on(t.orgId),
+  ]
+);
+
+export type AcademyOrgAssignmentRow = typeof academyOrgAssignmentsTable.$inferSelect;
+
+export const academyInstructorCoursesTable = pgTable(
+  "acad_instructor_courses",
+  {
+    id: text("id").primaryKey(), // acad_inst_crs_xxx
+    tenantId: text("tenant_id").notNull(),
+    instructorUserId: text("instructor_user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    courseId: text("course_id").notNull().references(() => academyCoursesTable.id, { onDelete: "cascade" }),
+    role: text("role").notNull().default("PRIMARY"), // PRIMARY | CO_INSTRUCTOR | TA
+    assignedAt: timestamp("assigned_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_inst_crs_tenant_idx").on(t.tenantId),
+    index("acad_inst_crs_inst_idx").on(t.instructorUserId),
+    index("acad_inst_crs_course_idx").on(t.courseId),
+    uniqueIndex("acad_inst_crs_uniq").on(t.tenantId, t.instructorUserId, t.courseId),
+  ]
+);
+
+export type AcademyInstructorCourseRow = typeof academyInstructorCoursesTable.$inferSelect;
+
+export const academyAdminLogsTable = pgTable(
+  "acad_admin_logs",
+  {
+    id: text("id").primaryKey(), // acad_adm_log_xxx
+    tenantId: text("tenant_id").notNull(),
+    adminUserId: text("admin_user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    action: text("action").notNull(), // COURSE_APPROVED | COURSE_UNPUBLISHED | INSTRUCTOR_VERIFIED | ETC
+    targetType: text("target_type").notNull(),
+    targetId: text("target_id").notNull(),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_adm_log_tenant_idx").on(t.tenantId),
+    index("acad_adm_log_admin_idx").on(t.adminUserId),
+  ]
+);
+
+export type AcademyAdminLogRow = typeof academyAdminLogsTable.$inferSelect;

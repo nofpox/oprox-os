@@ -3404,3 +3404,97 @@ export const academyAdminLogsTable = pgTable(
 );
 
 export type AcademyAdminLogRow = typeof academyAdminLogsTable.$inferSelect;
+
+export const academyTutorSessionsTable = pgTable(
+  "acad_tutor_sessions",
+  {
+    id: text("id").primaryKey(), // acad_tut_sess_xxx
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    courseId: text("course_id").notNull().references(() => academyCoursesTable.id, { onDelete: "cascade" }),
+    lessonId: text("lesson_id"),
+    title: text("title").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_tut_sess_tenant_idx").on(t.tenantId),
+    index("acad_tut_sess_user_idx").on(t.userId),
+    index("acad_tut_sess_course_idx").on(t.courseId),
+  ]
+);
+
+export type AcademyTutorSessionRow = typeof academyTutorSessionsTable.$inferSelect;
+
+export const academyTutorMessagesTable = pgTable(
+  "acad_tutor_messages",
+  {
+    id: text("id").primaryKey(), // acad_tut_msg_xxx
+    tenantId: text("tenant_id").notNull(),
+    sessionId: text("session_id").notNull().references(() => academyTutorSessionsTable.id, { onDelete: "cascade" }),
+    role: text("role").notNull(), // user | assistant | system
+    content: text("content").notNull(),
+    language: text("language").notNull().default("en"),
+    groundingContext: text("grounding_context"),
+    tokensUsed: integer("tokens_used").notNull().default(0),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_tut_msg_tenant_idx").on(t.tenantId),
+    index("acad_tut_msg_session_idx").on(t.sessionId),
+  ]
+);
+
+export type AcademyTutorMessageRow = typeof academyTutorMessagesTable.$inferSelect;
+
+export const academyLearnerMasteryTable = pgTable(
+  "acad_learner_mastery",
+  {
+    id: text("id").primaryKey(), // acad_mstr_xxx
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    courseId: text("course_id").notNull().references(() => academyCoursesTable.id, { onDelete: "cascade" }),
+    conceptKey: text("concept_key").notNull(),
+    masteryScore: integer("mastery_score").notNull().default(0), // 0 - 100
+    totalAttempts: integer("total_attempts").notNull().default(0),
+    correctAttempts: integer("correct_attempts").notNull().default(0),
+    lastEvaluatedAt: timestamp("last_evaluated_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_mstr_tenant_idx").on(t.tenantId),
+    index("acad_mstr_user_idx").on(t.userId),
+    index("acad_mstr_course_idx").on(t.courseId),
+    uniqueIndex("acad_mstr_uniq").on(t.tenantId, t.userId, t.courseId, t.conceptKey),
+  ]
+);
+
+export type AcademyLearnerMasteryRow = typeof academyLearnerMasteryTable.$inferSelect;
+
+export const academyAdaptiveRecommendationsTable = pgTable(
+  "acad_adaptive_recommendations",
+  {
+    id: text("id").primaryKey(), // acad_rec_xxx
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    courseId: text("course_id").notNull().references(() => academyCoursesTable.id, { onDelete: "cascade" }),
+    recommendationType: text("recommendation_type").notNull(), // REVIEW_LESSON | NEXT_LESSON | WEAK_CONCEPT | PRACTICE | NEXT_COURSE
+    titleEn: text("title_en").notNull(),
+    titleAr: text("title_ar").notNull(),
+    descriptionEn: text("description_en"),
+    descriptionAr: text("description_ar"),
+    lessonId: text("lesson_id"),
+    targetConcept: text("target_concept"),
+    priority: integer("priority").notNull().default(1),
+    isDismissed: boolean("is_dismissed").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_rec_tenant_idx").on(t.tenantId),
+    index("acad_rec_user_idx").on(t.userId),
+    index("acad_rec_course_idx").on(t.courseId),
+  ]
+);
+
+export type AcademyAdaptiveRecommendationRow = typeof academyAdaptiveRecommendationsTable.$inferSelect;

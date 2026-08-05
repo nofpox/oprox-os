@@ -30,7 +30,10 @@ export interface SecurityAuditEvent {
     | 'ACADEMY_COURSE_UNPUBLISHED'
     | 'ACADEMY_ORG_PROGRAM_CREATED'
     | 'ACADEMY_ORG_ASSIGNMENT_CREATED'
-    | 'ACADEMY_ADMIN_ACTION';
+    | 'ACADEMY_ADMIN_ACTION'
+    | 'ACADEMY_TUTOR_SESSION_CREATED'
+    | 'ACADEMY_TUTOR_INTERACTION'
+    | 'ACADEMY_MASTERY_UPDATED';
   userId?: string;
   userRole?: string;
   orgId?: string;

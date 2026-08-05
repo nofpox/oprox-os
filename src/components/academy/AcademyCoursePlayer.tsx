@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { AssessmentRunner } from './AssessmentRunner';
 import { AssignmentRunner } from './AssignmentRunner';
+import { AcademyAiTutorView } from './AcademyAiTutorView';
+import { AcademyAdaptiveRecommendationsView } from './AcademyAdaptiveRecommendationsView';
 
 export interface LessonResource {
   id: string;
@@ -99,6 +101,7 @@ export const AcademyCoursePlayer: React.FC<AcademyCoursePlayerProps> = ({
   const [markingComplete, setMarkingComplete] = useState(false);
   const [bookmarking, setBookmarking] = useState(false);
   const [bookmarkedLessons, setBookmarkedLessons] = useState<Set<string>>(new Set());
+  const [activePlayerTab, setActivePlayerTab] = useState<'content' | 'ai_tutor' | 'adaptive'>('content');
 
   useEffect(() => {
     loadPlayerPackage();
@@ -305,6 +308,45 @@ export const AcademyCoursePlayer: React.FC<AcademyCoursePlayerProps> = ({
           </span>
         </div>
 
+        {/* Player View Tabs (Content / AI Tutor / Adaptive) */}
+        <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+          <button
+            onClick={() => setActivePlayerTab('content')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+              activePlayerTab === 'content'
+                ? 'bg-indigo-600 text-white shadow'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <BookMarked className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{isRtl ? 'محتوى الدرس' : 'Lesson Content'}</span>
+          </button>
+
+          <button
+            onClick={() => setActivePlayerTab('ai_tutor')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+              activePlayerTab === 'ai_tutor'
+                ? 'bg-indigo-600 text-white shadow'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            <span>{isRtl ? 'المعلم الذكي' : 'AI Tutor'}</span>
+          </button>
+
+          <button
+            onClick={() => setActivePlayerTab('adaptive')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+              activePlayerTab === 'adaptive'
+                ? 'bg-indigo-600 text-white shadow'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Award className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">{isRtl ? 'التوصيات التكيفية' : 'Adaptive'}</span>
+          </button>
+        </div>
+
         {/* Actions */}
         <div className="flex items-center gap-2">
           {activeLessonId && (
@@ -336,7 +378,29 @@ export const AcademyCoursePlayer: React.FC<AcademyCoursePlayerProps> = ({
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
         {/* Course Content Viewport */}
         <main className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 bg-slate-950">
-          {activeLesson ? (
+          {activePlayerTab === 'ai_tutor' ? (
+            <div className="max-w-4xl mx-auto h-[650px]">
+              <AcademyAiTutorView
+                courseId={courseId}
+                courseTitle={courseTitle}
+                lessonId={activeLessonId}
+                lessonTitle={activeLesson ? (isRtl ? activeLesson.titleAr || activeLesson.titleEn : activeLesson.titleEn) : undefined}
+                lang={lang}
+              />
+            </div>
+          ) : activePlayerTab === 'adaptive' ? (
+            <div className="max-w-4xl mx-auto">
+              <AcademyAdaptiveRecommendationsView
+                courseId={courseId}
+                courseTitle={courseTitle}
+                lang={lang}
+                onNavigateLesson={(lid) => {
+                  setActiveLessonId(lid);
+                  setActivePlayerTab('content');
+                }}
+              />
+            </div>
+          ) : activeLesson ? (
             <div className="max-w-4xl mx-auto space-y-6">
               {/* Lesson Title & Type Header */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">

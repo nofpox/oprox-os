@@ -56,6 +56,14 @@ import {
   AcademyOrgAssignmentRow,
   AcademyInstructorCourseRow,
   AcademyAdminLogRow,
+  academyTutorSessionsTable,
+  academyTutorMessagesTable,
+  academyLearnerMasteryTable,
+  academyAdaptiveRecommendationsTable,
+  AcademyTutorSessionRow,
+  AcademyTutorMessageRow,
+  AcademyLearnerMasteryRow,
+  AcademyAdaptiveRecommendationRow,
 } from '../../db/schema';
 import { eq, and, desc, asc, sql } from 'drizzle-orm';
 import { logStructured } from '../logger';
@@ -94,6 +102,12 @@ const memoryOrgAssignments: AcademyOrgAssignmentRow[] = [];
 const memoryInstructorCourses: AcademyInstructorCourseRow[] = [];
 const memoryAdminLogs: AcademyAdminLogRow[] = [];
 
+// Phase 5 Memory Fallbacks
+const memoryTutorSessions: AcademyTutorSessionRow[] = [];
+const memoryTutorMessages: AcademyTutorMessageRow[] = [];
+const memoryLearnerMastery: AcademyLearnerMasteryRow[] = [];
+const memoryAdaptiveRecommendations: AcademyAdaptiveRecommendationRow[] = [];
+
 
 export function clearAcademyMemoryStore(): void {
   memoryProfiles.length = 0;
@@ -124,6 +138,10 @@ export function clearAcademyMemoryStore(): void {
   memoryOrgAssignments.length = 0;
   memoryInstructorCourses.length = 0;
   memoryAdminLogs.length = 0;
+  memoryTutorSessions.length = 0;
+  memoryTutorMessages.length = 0;
+  memoryLearnerMastery.length = 0;
+  memoryAdaptiveRecommendations.length = 0;
 }
 
 // ── Profiles ───────────────────────────────────────────────────────────────
@@ -2040,21 +2058,22 @@ export async function submitAssessmentAttempt(
 export async function getLearnerAssessmentAttempts(
   tenantId: string,
   userId: string,
-  assessmentId: string
+  assessmentId?: string
 ): Promise<AcademyAssessmentAttemptRow[]> {
   let list: AcademyAssessmentAttemptRow[] = [];
   if (db) {
     try {
+      const conditions = [
+        eq(academyAssessmentAttemptsTable.tenantId, tenantId),
+        eq(academyAssessmentAttemptsTable.userId, userId),
+      ];
+      if (assessmentId) {
+        conditions.push(eq(academyAssessmentAttemptsTable.assessmentId, assessmentId));
+      }
       list = await db
         .select()
         .from(academyAssessmentAttemptsTable)
-        .where(
-          and(
-            eq(academyAssessmentAttemptsTable.tenantId, tenantId),
-            eq(academyAssessmentAttemptsTable.userId, userId),
-            eq(academyAssessmentAttemptsTable.assessmentId, assessmentId)
-          )
-        )
+        .where(and(...conditions))
         .orderBy(desc(academyAssessmentAttemptsTable.attemptNumber));
     } catch (err) {
       logStructured('warn', 'ACADEMY_DB_GET_LEARNER_ATTEMPTS_FALLBACK', { error: String(err) });
@@ -2062,7 +2081,7 @@ export async function getLearnerAssessmentAttempts(
   }
   if (list.length === 0) {
     list = memoryAssessmentAttempts
-      .filter((a) => a.tenantId === tenantId && a.userId === userId && a.assessmentId === assessmentId)
+      .filter((a) => a.tenantId === tenantId && a.userId === userId && (!assessmentId || a.assessmentId === assessmentId))
       .sort((a, b) => b.attemptNumber - a.attemptNumber);
   }
   return list;
@@ -3083,4 +3102,424 @@ export async function logAdminAction(data: {
 
   memoryAdminLogs.push(row);
   return row;
+}
+
+// ── Phase 5 AI Tutor & Adaptive Learning ────────────────────────────────────
+
+export async function createTutorSession(data: {
+  tenantId: string;
+  userId: string;
+  courseId: string;
+  lessonId?: string;
+  title: string;
+}): Promise<AcademyTutorSessionRow> {
+  const id = `acad_tut_sess_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const now = new Date();
+  const row: AcademyTutorSessionRow = {
+    id,
+    tenantId: data.tenantId,
+    userId: data.userId,
+    courseId: data.courseId,
+    lessonId: data.lessonId || null,
+    title: data.title,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  if (db) {
+    try {
+      await db.insert(academyTutorSessionsTable).values(row as any);
+      return row;
+    } catch (err) {
+      logStructured('warn', 'ACADEMY_DB_CREATE_TUTOR_SESSION_FALLBACK', { error: String(err) });
+    }
+  }
+
+  memoryTutorSessions.push(row);
+  return row;
+}
+
+export async function getTutorSession(tenantId: string, userId: string, sessionId: string): Promise<AcademyTutorSessionRow | null> {
+  if (db) {
+    try {
+      const [sess] = await db
+        .select()
+        .from(academyTutorSessionsTable)
+        .where(and(eq(academyTutorSessionsTable.tenantId, tenantId), eq(academyTutorSessionsTable.userId, userId), eq(academyTutorSessionsTable.id, sessionId)));
+      return sess || null;
+    } catch (err) {
+      logStructured('warn', 'ACADEMY_DB_GET_TUTOR_SESSION_FALLBACK', { error: String(err) });
+    }
+  }
+
+  return memoryTutorSessions.find((s) => s.tenantId === tenantId && s.userId === userId && s.id === sessionId) || null;
+}
+
+export async function getUserTutorSessions(tenantId: string, userId: string, courseId?: string): Promise<AcademyTutorSessionRow[]> {
+  if (db) {
+    try {
+      let query = db
+        .select()
+        .from(academyTutorSessionsTable)
+        .where(and(eq(academyTutorSessionsTable.tenantId, tenantId), eq(academyTutorSessionsTable.userId, userId)));
+
+      const sessList = await query.orderBy(desc(academyTutorSessionsTable.updatedAt));
+      if (courseId) {
+        return sessList.filter((s) => s.courseId === courseId);
+      }
+      return sessList;
+    } catch (err) {
+      logStructured('warn', 'ACADEMY_DB_GET_USER_TUTOR_SESSIONS_FALLBACK', { error: String(err) });
+    }
+  }
+
+  let list = memoryTutorSessions.filter((s) => s.tenantId === tenantId && s.userId === userId);
+  if (courseId) {
+    list = list.filter((s) => s.courseId === courseId);
+  }
+  return list.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+}
+
+export async function addTutorMessage(data: {
+  tenantId: string;
+  sessionId: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  language?: string;
+  groundingContext?: string;
+  tokensUsed?: number;
+}): Promise<AcademyTutorMessageRow> {
+  const id = `acad_tut_msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const row: AcademyTutorMessageRow = {
+    id,
+    tenantId: data.tenantId,
+    sessionId: data.sessionId,
+    role: data.role,
+    content: data.content,
+    language: data.language || 'en',
+    groundingContext: data.groundingContext || null,
+    tokensUsed: data.tokensUsed || 0,
+    createdAt: new Date(),
+  };
+
+  if (db) {
+    try {
+      await db.insert(academyTutorMessagesTable).values(row as any);
+      await db
+        .update(academyTutorSessionsTable)
+        .set({ updatedAt: new Date() })
+        .where(and(eq(academyTutorSessionsTable.tenantId, data.tenantId), eq(academyTutorSessionsTable.id, data.sessionId)));
+      return row;
+    } catch (err) {
+      logStructured('warn', 'ACADEMY_DB_ADD_TUTOR_MSG_FALLBACK', { error: String(err) });
+    }
+  }
+
+  memoryTutorMessages.push(row);
+  const sess = memoryTutorSessions.find((s) => s.tenantId === data.tenantId && s.id === data.sessionId);
+  if (sess) sess.updatedAt = new Date();
+  return row;
+}
+
+export async function getSessionMessages(tenantId: string, sessionId: string): Promise<AcademyTutorMessageRow[]> {
+  if (db) {
+    try {
+      const msgs = await db
+        .select()
+        .from(academyTutorMessagesTable)
+        .where(and(eq(academyTutorMessagesTable.tenantId, tenantId), eq(academyTutorMessagesTable.sessionId, sessionId)))
+        .orderBy(asc(academyTutorMessagesTable.createdAt));
+      return msgs;
+    } catch (err) {
+      logStructured('warn', 'ACADEMY_DB_GET_SESSION_MSGS_FALLBACK', { error: String(err) });
+    }
+  }
+
+  return memoryTutorMessages
+    .filter((m) => m.tenantId === tenantId && m.sessionId === sessionId)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+}
+
+export async function upsertLearnerMastery(data: {
+  tenantId: string;
+  userId: string;
+  courseId: string;
+  conceptKey: string;
+  masteryScore: number;
+  totalAttempts: number;
+  correctAttempts: number;
+}): Promise<AcademyLearnerMasteryRow> {
+  const now = new Date();
+  const existing = await getLearnerMastery(data.tenantId, data.userId, data.courseId);
+  const matched = existing.find((m) => m.conceptKey === data.conceptKey);
+
+  if (matched) {
+    const updated: AcademyLearnerMasteryRow = {
+      ...matched,
+      masteryScore: Math.min(100, Math.max(0, data.masteryScore)),
+      totalAttempts: matched.totalAttempts + data.totalAttempts,
+      correctAttempts: matched.correctAttempts + data.correctAttempts,
+      lastEvaluatedAt: now,
+      updatedAt: now,
+    };
+
+    if (db) {
+      try {
+        await db
+          .update(academyLearnerMasteryTable)
+          .set({
+            masteryScore: updated.masteryScore,
+            totalAttempts: updated.totalAttempts,
+            correctAttempts: updated.correctAttempts,
+            lastEvaluatedAt: now,
+            updatedAt: now,
+          })
+          .where(and(eq(academyLearnerMasteryTable.tenantId, data.tenantId), eq(academyLearnerMasteryTable.id, matched.id)));
+        return updated;
+      } catch (err) {
+        logStructured('warn', 'ACADEMY_DB_UPSERT_MASTERY_UPDATE_FALLBACK', { error: String(err) });
+      }
+    }
+
+    const idx = memoryLearnerMastery.findIndex((m) => m.id === matched.id);
+    if (idx >= 0) memoryLearnerMastery[idx] = updated;
+    return updated;
+  }
+
+  const id = `acad_mstr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const row: AcademyLearnerMasteryRow = {
+    id,
+    tenantId: data.tenantId,
+    userId: data.userId,
+    courseId: data.courseId,
+    conceptKey: data.conceptKey,
+    masteryScore: Math.min(100, Math.max(0, data.masteryScore)),
+    totalAttempts: data.totalAttempts,
+    correctAttempts: data.correctAttempts,
+    lastEvaluatedAt: now,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  if (db) {
+    try {
+      await db.insert(academyLearnerMasteryTable).values(row as any);
+      return row;
+    } catch (err) {
+      logStructured('warn', 'ACADEMY_DB_UPSERT_MASTERY_INSERT_FALLBACK', { error: String(err) });
+    }
+  }
+
+  memoryLearnerMastery.push(row);
+  return row;
+}
+
+export async function getLearnerMastery(tenantId: string, userId: string, courseId: string): Promise<AcademyLearnerMasteryRow[]> {
+  if (db) {
+    try {
+      const records = await db
+        .select()
+        .from(academyLearnerMasteryTable)
+        .where(
+          and(
+            eq(academyLearnerMasteryTable.tenantId, tenantId),
+            eq(academyLearnerMasteryTable.userId, userId),
+            eq(academyLearnerMasteryTable.courseId, courseId)
+          )
+        );
+      return records;
+    } catch (err) {
+      logStructured('warn', 'ACADEMY_DB_GET_LEARNER_MASTERY_FALLBACK', { error: String(err) });
+    }
+  }
+
+  return memoryLearnerMastery.filter(
+    (m) => m.tenantId === tenantId && m.userId === userId && m.courseId === courseId
+  );
+}
+
+export async function generateAdaptiveRecommendations(
+  tenantId: string,
+  userId: string,
+  courseId: string
+): Promise<AcademyAdaptiveRecommendationRow[]> {
+  // Fetch real learner data
+  const attempts = await getLearnerAssessmentAttempts(tenantId, userId);
+  const courseProgressList = await getCourseProgress(tenantId, userId, courseId);
+  const modules = await listCourseModules(tenantId, courseId);
+  const lessonsLists = await Promise.all(modules.map((m) => listModuleLessons(tenantId, m.id)));
+  const lessons = lessonsLists.flat();
+  const mastery = await getLearnerMastery(tenantId, userId, courseId);
+
+  const courseAttempts = attempts.filter((a) => a.courseId === courseId);
+  const recsToInsert: Array<Omit<AcademyAdaptiveRecommendationRow, 'id' | 'createdAt'>> = [];
+
+  // Check assessment performance signals
+  const failedAttempts = courseAttempts.filter((a) => a.scorePercent < 70);
+  if (failedAttempts.length > 0) {
+    recsToInsert.push({
+      tenantId,
+      userId,
+      courseId,
+      recommendationType: 'WEAK_CONCEPT',
+      titleEn: 'Review Low-Scoring Assessment Topics',
+      titleAr: 'مراجعة المواضيع ذات الدرجات المنخفضة في التقييم',
+      descriptionEn: `Your score was ${failedAttempts[0].scorePercent}%. Revisit key lesson materials to strengthen your understanding before retaking.`,
+      descriptionAr: `كانت درجتك ${failedAttempts[0].scorePercent}%. يرجى مراجعة مواد الدروس لتعزيز فهمك قبل إعادة المحاولة.`,
+      lessonId: null,
+      targetConcept: 'Assessment Revision',
+      priority: 1,
+      isDismissed: false,
+    });
+  }
+
+  // Check uncompleted lessons
+  if (lessons.length > 0) {
+    const courseProgress = courseProgressList[0];
+    const completedPct = courseProgress?.progressPercent || 0;
+
+    if (completedPct < 100) {
+      recsToInsert.push({
+        tenantId,
+        userId,
+        courseId,
+        recommendationType: 'NEXT_LESSON',
+        titleEn: 'Continue Your Learning Pathway',
+        titleAr: 'مواصلة مسارك التعليمي',
+        descriptionEn: `You have completed ${completedPct}% of the course. Keep your streak going!`,
+        descriptionAr: `لقد أكملت ${completedPct}% من الدوره. حافظ على استمرارية تقدمك!`,
+        lessonId: lessons[0]?.id || null,
+        targetConcept: 'Course Continuity',
+        priority: 2,
+        isDismissed: false,
+      });
+    } else {
+      recsToInsert.push({
+        tenantId,
+        userId,
+        courseId,
+        recommendationType: 'NEXT_COURSE',
+        titleEn: 'Course Completed — Explore Next Path',
+        titleAr: 'تم إكمال الدورة — استكشف المسار التالي',
+        descriptionEn: 'Congratulations on completing this course! Check out advanced paths to continue your skill growth.',
+        descriptionAr: 'تهانينا لإكمال هذه الدورة! استكشف المسارات المتقدمة لمواصلة تطوير مهاراتك.',
+        lessonId: null,
+        targetConcept: 'Advancement',
+        priority: 3,
+        isDismissed: false,
+      });
+    }
+  }
+
+  // Check concept mastery signals
+  const weakConcepts = mastery.filter((m) => m.masteryScore < 60);
+  for (const wc of weakConcepts) {
+    recsToInsert.push({
+      tenantId,
+      userId,
+      courseId,
+      recommendationType: 'REVIEW_LESSON',
+      titleEn: `Practice Concept: ${wc.conceptKey}`,
+      titleAr: `تمارين إضافية للمفهوم: ${wc.conceptKey}`,
+      descriptionEn: `Mastery score is ${wc.masteryScore}%. Solve practice exercises or ask the AI Tutor for clarification on this topic.`,
+      descriptionAr: `درجة الإتقان ${wc.masteryScore}%. يرجى حل التمارين أو سؤال المعلم الذكي للحصول على إيضاحات.`,
+      lessonId: null,
+      targetConcept: wc.conceptKey,
+      priority: 2,
+      isDismissed: false,
+    });
+  }
+
+  // Save generated recommendations
+  const resultRows: AcademyAdaptiveRecommendationRow[] = [];
+  for (const r of recsToInsert) {
+    const id = `acad_rec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const row: AcademyAdaptiveRecommendationRow = {
+      ...r,
+      id,
+      createdAt: new Date(),
+    };
+
+    if (db) {
+      try {
+        await db.insert(academyAdaptiveRecommendationsTable).values(row as any);
+      } catch (err) {
+        logStructured('warn', 'ACADEMY_DB_GEN_REC_INSERT_FALLBACK', { error: String(err) });
+      }
+    }
+    memoryAdaptiveRecommendations.push(row);
+    resultRows.push(row);
+  }
+
+  return resultRows;
+}
+
+export async function getAdaptiveRecommendations(
+  tenantId: string,
+  userId: string,
+  courseId: string
+): Promise<AcademyAdaptiveRecommendationRow[]> {
+  if (db) {
+    try {
+      const recs = await db
+        .select()
+        .from(academyAdaptiveRecommendationsTable)
+        .where(
+          and(
+            eq(academyAdaptiveRecommendationsTable.tenantId, tenantId),
+            eq(academyAdaptiveRecommendationsTable.userId, userId),
+            eq(academyAdaptiveRecommendationsTable.courseId, courseId),
+            eq(academyAdaptiveRecommendationsTable.isDismissed, false)
+          )
+        )
+        .orderBy(asc(academyAdaptiveRecommendationsTable.priority));
+      return recs;
+    } catch (err) {
+      logStructured('warn', 'ACADEMY_DB_GET_RECS_FALLBACK', { error: String(err) });
+    }
+  }
+
+  const userCourseRecs = memoryAdaptiveRecommendations.filter(
+    (r) => r.tenantId === tenantId && r.userId === userId && r.courseId === courseId
+  );
+
+  if (userCourseRecs.length > 0) {
+    return userCourseRecs.filter((r) => !r.isDismissed);
+  }
+
+  // Auto-generate if none exist
+  return generateAdaptiveRecommendations(tenantId, userId, courseId);
+}
+
+export async function dismissRecommendation(
+  tenantId: string,
+  userId: string,
+  recommendationId: string
+): Promise<boolean> {
+  if (db) {
+    try {
+      await db
+        .update(academyAdaptiveRecommendationsTable)
+        .set({ isDismissed: true })
+        .where(
+          and(
+            eq(academyAdaptiveRecommendationsTable.tenantId, tenantId),
+            eq(academyAdaptiveRecommendationsTable.userId, userId),
+            eq(academyAdaptiveRecommendationsTable.id, recommendationId)
+          )
+        );
+      return true;
+    } catch (err) {
+      logStructured('warn', 'ACADEMY_DB_DISMISS_REC_FALLBACK', { error: String(err) });
+    }
+  }
+
+  const rec = memoryAdaptiveRecommendations.find(
+    (r) => r.tenantId === tenantId && r.userId === userId && r.id === recommendationId
+  );
+  if (rec) {
+    rec.isDismissed = true;
+    return true;
+  }
+  return false;
 }

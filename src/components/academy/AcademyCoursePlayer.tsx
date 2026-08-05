@@ -20,6 +20,8 @@ import {
   ExternalLink,
   RotateCcw
 } from 'lucide-react';
+import { AssessmentRunner } from './AssessmentRunner';
+import { AssignmentRunner } from './AssignmentRunner';
 
 export interface LessonResource {
   id: string;
@@ -438,19 +440,20 @@ export const AcademyCoursePlayer: React.FC<AcademyCoursePlayerProps> = ({
               )}
 
               {activeLesson.lessonType === 'QUIZ' && (
-                <div className="p-8 rounded-2xl bg-slate-900 border border-cyan-500/30 space-y-4 text-center">
-                  <div className="w-12 h-12 mx-auto rounded-full bg-cyan-500/10 text-cyan-400 flex items-center justify-center border border-cyan-500/20">
-                    <HelpCircle className="w-6 h-6" />
-                  </div>
-                  <h3 className="text-base font-bold text-white">
-                    {isRtl ? 'اختبار تقييمي للدورة' : 'Knowledge Check & Quiz'}
-                  </h3>
-                  <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-                    {isRtl
-                      ? 'اختبار فهم واستيعاب المفاهيم. سيتم ربط محرك الاختبارات في الفاز التالي (Phase 3).'
-                      : 'Course comprehension quiz module. Assessment engine will unlock in Phase 3.'}
-                  </p>
-                </div>
+                <AssessmentRunner
+                  courseId={playerData.course.id}
+                  lessonId={activeLesson.id}
+                  isRtl={isRtl}
+                  onQuizPassed={handleToggleComplete}
+                />
+              )}
+
+              {activeLesson.lessonType === 'ASSIGNMENT' && (
+                <AssignmentRunner
+                  courseId={playerData.course.id}
+                  lessonId={activeLesson.id}
+                  isRtl={isRtl}
+                />
               )}
 
               {/* Lesson Resources Download Section */}

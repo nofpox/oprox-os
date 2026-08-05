@@ -26,6 +26,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { AcademyCoursePlayer } from './AcademyCoursePlayer';
+import { CertificatesView } from './CertificatesView';
 
 export interface AcademyCourse {
   id: string;
@@ -114,7 +115,7 @@ export interface CourseDetailPayload {
 
 export const OproxAcademyWorkspace: React.FC = () => {
   const [lang, setLang] = useState<'en' | 'ar'>('en');
-  const [activeTab, setActiveTab] = useState<'catalog' | 'paths' | 'my-learning'>('catalog');
+  const [activeTab, setActiveTab] = useState<'catalog' | 'paths' | 'my-learning' | 'certificates'>('catalog');
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -315,13 +316,25 @@ export const OproxAcademyWorkspace: React.FC = () => {
                 : 'border-transparent text-slate-400 hover:text-white'
             }`}
           >
-            <Award className="w-4 h-4" />
+            <BookMarked className="w-4 h-4" />
             <span>{isRtl ? 'دوراتي المسجلة' : 'My Enrolled Courses'}</span>
             {myEnrollments.length > 0 && (
               <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-emerald-500/20 text-emerald-300">
                 {myEnrollments.length}
               </span>
             )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('certificates')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-t-xl transition-all border-b-2 ${
+              activeTab === 'certificates'
+                ? 'border-amber-400 text-amber-400 bg-amber-500/10'
+                : 'border-transparent text-slate-400 hover:text-white'
+            }`}
+          >
+            <Award className="w-4 h-4" />
+            <span>{isRtl ? 'الشهادات والاعتمادات' : 'Certificates'}</span>
           </button>
         </div>
       </div>
@@ -687,6 +700,11 @@ export const OproxAcademyWorkspace: React.FC = () => {
             </div>
           )}
         </div>
+      )}
+
+      {/* CERTIFICATES TAB */}
+      {activeTab === 'certificates' && (
+        <CertificatesView isRtl={isRtl} myEnrollments={myEnrollments} />
       )}
 
       {/* FULLSCREEN COURSE PLAYER MODAL */}

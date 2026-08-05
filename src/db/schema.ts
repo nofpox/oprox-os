@@ -3054,3 +3054,204 @@ export const academyBookmarksTable = pgTable(
 );
 
 export type AcademyBookmarkRow = typeof academyBookmarksTable.$inferSelect;
+
+// ── OPROX Academy Phase 3 Tables ─────────────────────────────────────────────
+
+export const academyAssessmentsTable = pgTable(
+  "acad_assessments",
+  {
+    id: text("id").primaryKey(), // acad_asmt_xxx
+    tenantId: text("tenant_id").notNull(),
+    courseId: text("course_id").notNull().references(() => academyCoursesTable.id, { onDelete: "cascade" }),
+    moduleId: text("module_id").references(() => academyCourseModulesTable.id, { onDelete: "cascade" }),
+    lessonId: text("lesson_id").references(() => academyLessonsTable.id, { onDelete: "cascade" }),
+    titleEn: text("title_en").notNull(),
+    titleAr: text("title_ar").notNull(),
+    descriptionEn: text("description_en"),
+    descriptionAr: text("description_ar"),
+    passingScorePercent: integer("passing_score_percent").notNull().default(70),
+    maxAttempts: integer("max_attempts").default(3),
+    timeLimitMinutes: integer("time_limit_minutes").default(0),
+    shuffleQuestions: boolean("shuffle_questions").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_asmt_tenant_idx").on(t.tenantId),
+    index("acad_asmt_crs_idx").on(t.courseId),
+  ]
+);
+
+export type AcademyAssessmentRow = typeof academyAssessmentsTable.$inferSelect;
+
+export const academyAssessmentQuestionsTable = pgTable(
+  "acad_assessment_questions",
+  {
+    id: text("id").primaryKey(), // acad_quest_xxx
+    tenantId: text("tenant_id").notNull(),
+    assessmentId: text("assessment_id").notNull().references(() => academyAssessmentsTable.id, { onDelete: "cascade" }),
+    questionTextEn: text("question_text_en").notNull(),
+    questionTextAr: text("question_text_ar").notNull(),
+    questionType: text("question_type").notNull().default("SINGLE_CHOICE"), // SINGLE_CHOICE | MULTIPLE_CHOICE | TRUE_FALSE | SHORT_ANSWER
+    points: integer("points").notNull().default(1),
+    displayOrder: integer("display_order").notNull().default(1),
+    explanationEn: text("explanation_en"),
+    explanationAr: text("explanation_ar"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_quest_tenant_idx").on(t.tenantId),
+    index("acad_quest_asmt_idx").on(t.assessmentId),
+  ]
+);
+
+export type AcademyAssessmentQuestionRow = typeof academyAssessmentQuestionsTable.$inferSelect;
+
+export const academyAssessmentChoicesTable = pgTable(
+  "acad_assessment_choices",
+  {
+    id: text("id").primaryKey(), // acad_choice_xxx
+    tenantId: text("tenant_id").notNull(),
+    questionId: text("question_id").notNull().references(() => academyAssessmentQuestionsTable.id, { onDelete: "cascade" }),
+    choiceTextEn: text("choice_text_en").notNull(),
+    choiceTextAr: text("choice_text_ar").notNull(),
+    isCorrect: boolean("is_correct").notNull().default(false),
+    displayOrder: integer("display_order").notNull().default(1),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_choice_tenant_idx").on(t.tenantId),
+    index("acad_choice_quest_idx").on(t.questionId),
+  ]
+);
+
+export type AcademyAssessmentChoiceRow = typeof academyAssessmentChoicesTable.$inferSelect;
+
+export const academyAssessmentAttemptsTable = pgTable(
+  "acad_assessment_attempts",
+  {
+    id: text("id").primaryKey(), // acad_att_xxx
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    assessmentId: text("assessment_id").notNull().references(() => academyAssessmentsTable.id, { onDelete: "cascade" }),
+    courseId: text("course_id").notNull().references(() => academyCoursesTable.id, { onDelete: "cascade" }),
+    attemptNumber: integer("attempt_number").notNull().default(1),
+    status: text("status").notNull().default("IN_PROGRESS"), // IN_PROGRESS | SUBMITTED | EVALUATED
+    scorePoints: integer("score_points").default(0),
+    maxPoints: integer("max_points").default(0),
+    scorePercent: integer("score_percent").default(0),
+    passed: boolean("passed").default(false),
+    startedAt: timestamp("started_at").notNull().defaultNow(),
+    submittedAt: timestamp("submitted_at"),
+  },
+  (t) => [
+    index("acad_att_tenant_idx").on(t.tenantId),
+    index("acad_att_user_idx").on(t.userId),
+    index("acad_att_asmt_idx").on(t.assessmentId),
+  ]
+);
+
+export type AcademyAssessmentAttemptRow = typeof academyAssessmentAttemptsTable.$inferSelect;
+
+export const academyLearnerAnswersTable = pgTable(
+  "acad_learner_answers",
+  {
+    id: text("id").primaryKey(), // acad_ans_xxx
+    tenantId: text("tenant_id").notNull(),
+    attemptId: text("attempt_id").notNull().references(() => academyAssessmentAttemptsTable.id, { onDelete: "cascade" }),
+    questionId: text("question_id").notNull().references(() => academyAssessmentQuestionsTable.id, { onDelete: "cascade" }),
+    selectedChoiceIds: text("selected_choice_ids"),
+    shortAnswerText: text("short_answer_text"),
+    isCorrect: boolean("is_correct").default(false),
+    pointsEarned: integer("points_earned").default(0),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_ans_tenant_idx").on(t.tenantId),
+    index("acad_ans_att_idx").on(t.attemptId),
+  ]
+);
+
+export type AcademyLearnerAnswerRow = typeof academyLearnerAnswersTable.$inferSelect;
+
+export const academyAssignmentsTable = pgTable(
+  "acad_assignments",
+  {
+    id: text("id").primaryKey(), // acad_asgn_xxx
+    tenantId: text("tenant_id").notNull(),
+    courseId: text("course_id").notNull().references(() => academyCoursesTable.id, { onDelete: "cascade" }),
+    moduleId: text("module_id").references(() => academyCourseModulesTable.id, { onDelete: "cascade" }),
+    lessonId: text("lesson_id").references(() => academyLessonsTable.id, { onDelete: "cascade" }),
+    titleEn: text("title_en").notNull(),
+    titleAr: text("title_ar").notNull(),
+    instructionsEn: text("instructions_en"),
+    instructionsAr: text("instructions_ar"),
+    maxScore: integer("max_score").notNull().default(100),
+    passingScore: integer("passing_score").notNull().default(60),
+    allowResubmission: boolean("allow_resubmission").notNull().default(true),
+    dueDate: timestamp("due_date"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_asgn_tenant_idx").on(t.tenantId),
+    index("acad_asgn_crs_idx").on(t.courseId),
+  ]
+);
+
+export type AcademyAssignmentRow = typeof academyAssignmentsTable.$inferSelect;
+
+export const academyAssignmentSubmissionsTable = pgTable(
+  "acad_assignment_submissions",
+  {
+    id: text("id").primaryKey(), // acad_sub_xxx
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    assignmentId: text("assignment_id").notNull().references(() => academyAssignmentsTable.id, { onDelete: "cascade" }),
+    courseId: text("course_id").notNull().references(() => academyCoursesTable.id, { onDelete: "cascade" }),
+    submissionText: text("submission_text"),
+    resourceUrls: text("resource_urls"),
+    status: text("status").notNull().default("SUBMITTED"), // SUBMITTED | GRADED | RESUBMISSION_REQUESTED
+    score: integer("score"),
+    instructorFeedbackEn: text("instructor_feedback_en"),
+    instructorFeedbackAr: text("instructor_feedback_ar"),
+    gradedByUserId: text("graded_by_user_id").references(() => usersTable.id, { onDelete: "set null" }),
+    submittedAt: timestamp("submitted_at").notNull().defaultNow(),
+    gradedAt: timestamp("graded_at"),
+  },
+  (t) => [
+    index("acad_sub_tenant_idx").on(t.tenantId),
+    index("acad_sub_user_idx").on(t.userId),
+    index("acad_sub_asgn_idx").on(t.assignmentId),
+  ]
+);
+
+export type AcademyAssignmentSubmissionRow = typeof academyAssignmentSubmissionsTable.$inferSelect;
+
+export const academyCertificatesTable = pgTable(
+  "acad_certificates",
+  {
+    id: text("id").primaryKey(), // acad_cert_xxx
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    courseId: text("course_id").notNull().references(() => academyCoursesTable.id, { onDelete: "cascade" }),
+    certificateNumber: text("certificate_number").notNull(),
+    verificationCode: text("verification_code").notNull(),
+    completionScorePercent: integer("completion_score_percent").notNull().default(100),
+    issueDate: timestamp("issue_date").notNull().defaultNow(),
+    status: text("status").notNull().default("ISSUED"), // ISSUED | REVOKED
+    metadata: text("metadata"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("acad_cert_tenant_idx").on(t.tenantId),
+    index("acad_cert_user_idx").on(t.userId),
+    index("acad_cert_crs_idx").on(t.courseId),
+    uniqueIndex("acad_cert_num_uniq").on(t.certificateNumber),
+    uniqueIndex("acad_cert_vcode_uniq").on(t.verificationCode),
+    uniqueIndex("acad_cert_tenant_user_crs_uniq").on(t.tenantId, t.userId, t.courseId),
+  ]
+);
+
+export type AcademyCertificateRow = typeof academyCertificatesTable.$inferSelect;

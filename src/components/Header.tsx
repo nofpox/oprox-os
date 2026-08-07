@@ -18,8 +18,7 @@ import {
   Search,
   Bell,
   Settings,
-  FolderKanban,
-  GraduationCap
+  FolderKanban
 } from 'lucide-react';
 import { AppMode } from '../types';
 
@@ -57,7 +56,6 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'oprox-code-ai', label: 'OPROX Code / AI', icon: <Cpu className="w-4 h-4 text-emerald-400" />, badge: 'Phase 1-6' },
     { id: 'studio', label: 'OPROX Studio', icon: <Palette className="w-4 h-4 text-pink-400" />, badge: 'Low-Code' },
     { id: 'real-estate', label: 'OPROX Real Estate', icon: <Building2 className="w-4 h-4 text-amber-400" />, badge: 'Engine' },
-    { id: 'academy', label: 'OPROX Academy', icon: <GraduationCap className="w-4 h-4 text-cyan-400" />, badge: 'Phase 1' },
     { id: 'solutions', label: 'Solutions Hub', icon: <ShoppingBag className="w-4 h-4" />, badge: 'Apps' },
     { id: 'platform-suite', label: 'Platform Suite', icon: <Sliders className="w-4 h-4" />, badge: '33 Pages' },
     { id: 'ai-os', label: 'AI Studio OS', icon: <Sparkles className="w-4 h-4" />, badge: 'AI Swarm' },

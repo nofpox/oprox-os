@@ -1,19 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { Header } from './components/Header';
-import { ShowcaseView } from './components/showcase/ShowcaseView';
-import { OproxCodeIDE } from './components/ide/OproxCodeIDE';
-import { AiOperatingSystem } from './components/ai/AiOperatingSystem';
-import { OproxCodeAiSuite } from './components/ai/OproxCodeAiSuite';
-import { StudioAppSuite } from './components/studio/StudioAppSuite';
-import { DatabaseStudio } from './components/database/DatabaseStudio';
-import { CloudMonitors } from './components/cloud/CloudMonitors';
-import { EnterpriseOS } from './components/memory/EnterpriseOS';
-import { MediaStudio } from './components/verticals/MediaStudio';
-import { PropTechStudio } from './components/verticals/PropTechStudio';
-import { OproxRealEstateWorkspace } from './components/realestate/OproxRealEstateWorkspace';
-import { SolutionsPlatform } from './components/solutions/SolutionsPlatform';
-import { PlatformHub } from './components/platform/PlatformHub';
-import { DesignSystemView } from './components/design/DesignSystemView';
 import { DashboardView } from './components/dashboard/DashboardView';
 import { useUIState } from './integration/UIStateContext';
 import { NotificationToastContainer } from './integration/NotificationToast';
@@ -24,6 +10,30 @@ import { NotificationCenterModal } from './components/common/NotificationCenterM
 import { ProjectManagementModal } from './components/common/ProjectManagementModal';
 import { UserSettingsModal } from './components/common/UserSettingsModal';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+
+// Lazy-loaded heavy views & workspaces
+const ShowcaseView = lazy(() => import('./components/showcase/ShowcaseView').then(m => ({ default: m.ShowcaseView })));
+const OproxCodeIDE = lazy(() => import('./components/ide/OproxCodeIDE').then(m => ({ default: m.OproxCodeIDE })));
+const AiOperatingSystem = lazy(() => import('./components/ai/AiOperatingSystem').then(m => ({ default: m.AiOperatingSystem })));
+const OproxCodeAiSuite = lazy(() => import('./components/ai/OproxCodeAiSuite').then(m => ({ default: m.OproxCodeAiSuite })));
+const StudioAppSuite = lazy(() => import('./components/studio/StudioAppSuite').then(m => ({ default: m.StudioAppSuite })));
+const DatabaseStudio = lazy(() => import('./components/database/DatabaseStudio').then(m => ({ default: m.DatabaseStudio })));
+const CloudMonitors = lazy(() => import('./components/cloud/CloudMonitors').then(m => ({ default: m.CloudMonitors })));
+const EnterpriseOS = lazy(() => import('./components/memory/EnterpriseOS').then(m => ({ default: m.EnterpriseOS })));
+const MediaStudio = lazy(() => import('./components/verticals/MediaStudio').then(m => ({ default: m.MediaStudio })));
+const OproxRealEstateWorkspace = lazy(() => import('./components/realestate/OproxRealEstateWorkspace').then(m => ({ default: m.OproxRealEstateWorkspace })));
+const SolutionsPlatform = lazy(() => import('./components/solutions/SolutionsPlatform').then(m => ({ default: m.SolutionsPlatform })));
+const PlatformHub = lazy(() => import('./components/platform/PlatformHub').then(m => ({ default: m.PlatformHub })));
+const DesignSystemView = lazy(() => import('./components/design/DesignSystemView').then(m => ({ default: m.DesignSystemView })));
+
+const SuspenseFallback = () => (
+  <div className="flex items-center justify-center min-h-[400px] w-full">
+    <div className="flex flex-col items-center gap-3">
+      <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+      <span className="text-xs text-slate-400 font-medium">Loading workspace module...</span>
+    </div>
+  </div>
+);
 
 export default function App() {
   const {
@@ -72,69 +82,71 @@ export default function App() {
 
       <main className="max-w-[1700px] mx-auto px-4 pt-4">
         <ErrorBoundary>
-          {currentMode === 'dashboard' && (
-            <DashboardView
-              onNavigateMode={setCurrentMode}
-              onLaunchIdeWithPrompt={handleLaunchIdeWithPrompt}
-              theme={theme}
-            />
-          )}
+          <Suspense fallback={<SuspenseFallback />}>
+            {currentMode === 'dashboard' && (
+              <DashboardView
+                onNavigateMode={setCurrentMode}
+                onLaunchIdeWithPrompt={handleLaunchIdeWithPrompt}
+                theme={theme}
+              />
+            )}
 
-          {currentMode === 'ai-os' && (
-            <AiOperatingSystem
-              initialPrompt={activePrompt}
-              onLaunchIdeWithPrompt={handleLaunchIdeWithPrompt}
-              theme={theme}
-            />
-          )}
+            {currentMode === 'ai-os' && (
+              <AiOperatingSystem
+                initialPrompt={activePrompt}
+                onLaunchIdeWithPrompt={handleLaunchIdeWithPrompt}
+                theme={theme}
+              />
+            )}
 
-          {currentMode === 'oprox-code-ai' && (
-            <OproxCodeAiSuite
-              theme={theme}
-              activeProjectTitle={activeProjectTitle}
-            />
-          )}
+            {currentMode === 'oprox-code-ai' && (
+              <OproxCodeAiSuite
+                theme={theme}
+                activeProjectTitle={activeProjectTitle}
+              />
+            )}
 
-          {currentMode === 'studio' && (
-            <StudioAppSuite />
-          )}
+            {currentMode === 'studio' && (
+              <StudioAppSuite />
+            )}
 
-          {currentMode === 'solutions' && (
-            <SolutionsPlatform theme={theme} />
-          )}
+            {currentMode === 'solutions' && (
+              <SolutionsPlatform theme={theme} />
+            )}
 
-          {currentMode === 'platform-suite' && (
-            <PlatformHub theme={theme} />
-          )}
+            {currentMode === 'platform-suite' && (
+              <PlatformHub theme={theme} />
+            )}
 
-          {currentMode === 'design-system' && (
-            <DesignSystemView theme={theme} onToggleTheme={toggleTheme} />
-          )}
+            {currentMode === 'design-system' && (
+              <DesignSystemView theme={theme} onToggleTheme={toggleTheme} />
+            )}
 
-          {currentMode === 'ide' && (
-            <OproxCodeIDE
-              initialPrompt={activePrompt}
-              onProjectChange={setActiveProjectTitle}
-            />
-          )}
+            {currentMode === 'ide' && (
+              <OproxCodeIDE
+                initialPrompt={activePrompt}
+                onProjectChange={setActiveProjectTitle}
+              />
+            )}
 
-          {currentMode === 'showcase' && (
-            <ShowcaseView
-              onLaunchIdeWithPrompt={handleLaunchIdeWithPrompt}
-              onNavigateMode={setCurrentMode}
-              theme={theme}
-            />
-          )}
+            {currentMode === 'showcase' && (
+              <ShowcaseView
+                onLaunchIdeWithPrompt={handleLaunchIdeWithPrompt}
+                onNavigateMode={setCurrentMode}
+                theme={theme}
+              />
+            )}
 
-          {currentMode === 'database' && <DatabaseStudio />}
+            {currentMode === 'database' && <DatabaseStudio />}
 
-          {currentMode === 'cloud' && <CloudMonitors />}
+            {currentMode === 'cloud' && <CloudMonitors />}
 
-          {currentMode === 'enterprise' && <EnterpriseOS />}
+            {currentMode === 'enterprise' && <EnterpriseOS />}
 
-          {currentMode === 'media' && <MediaStudio />}
+            {currentMode === 'media' && <MediaStudio />}
 
-          {(currentMode === 'real-estate' || currentMode === 'proptech') && <OproxRealEstateWorkspace />}
+            {(currentMode === 'real-estate' || currentMode === 'proptech') && <OproxRealEstateWorkspace />}
+          </Suspense>
         </ErrorBoundary>
       </main>
 

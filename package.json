@@ -1,7 +1,8 @@
 {
-  "name": "react-example",
+  "name": "oprox-os",
   "private": true,
   "version": "0.0.0",
+  "description": "Corporate Innovation Showcase and Live Autonomous AI Software Engineering Operating System",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",

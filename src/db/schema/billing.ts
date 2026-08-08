@@ -50,8 +50,12 @@ export const localInvoicesTable = pgTable(
     sequentialNumber: text("sequential_number").notNull().unique(),
     invoiceType: text("invoice_type").notNull().default("B2C_SIMPLIFIED_INVOICE"), // "B2B_TAX_INVOICE" | "B2C_SIMPLIFIED_INVOICE"
     stripeCustomerId: text("stripe_customer_id"),
-    userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
-    orgId: text("org_id").references(() => organizationsTable.id, { onDelete: "cascade" }),
+    // Nullable — invoices may be created by system actors (e.g. RE automation) that do not have
+    // a corresponding row in the platform users table. FK removed in migration 0019.
+    userId: text("user_id"),
+    // FK removed in migration 0020 — RE module uses arbitrary tenant IDs as org_id,
+    // not rows in the platform organizations table.
+    orgId: text("org_id"),
     amountDue: integer("amount_due").notNull().default(0), // minor units
     amountPaid: integer("amount_paid").notNull().default(0), // minor units
     subtotalHalalas: integer("subtotal_halalas").notNull().default(0),

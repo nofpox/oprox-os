@@ -27,6 +27,9 @@ const memoryPolicies: any[] = [];
 const memoryAutonomyConfig: Map<string, any> = new Map();
 const memoryEvents: any[] = [];
 
+/** True in NODE_ENV=production. In-memory fallbacks are disabled; DB failures are fatal. */
+const PRODUCTION = process.env.NODE_ENV === 'production';
+
 export function clearPhase5MemoryStore(): void {
   memoryTeams.length = 0;
   memoryMemberships.length = 0;
@@ -66,6 +69,7 @@ export async function createTeamInStore(team: {
       await db.insert(phase5TeamsTable).values(row as any);
     } catch (err: any) {
       logStructured('error', 'PHASE5_DB_CREATE_TEAM_FAILED', { error: err?.message || err });
+      if (PRODUCTION) throw err;  // Fail loudly in production — data must not be silently lost
     }
   }
 
@@ -82,9 +86,11 @@ export async function getTeamsInStore(tenantId: string) {
       if (rows.length > 0) return rows;
     } catch (err: any) {
       logStructured('error', 'PHASE5_DB_GET_TEAMS_FAILED', { error: err?.message || err });
+      if (PRODUCTION) throw err;  // Fail loudly in production — data must not be silently lost
     }
   }
 
+  if (PRODUCTION) throw new Error('[OPROX OS] Database unavailable or read failed in production. Cannot serve from in-memory store.');
   return memoryTeams.filter((t) => t.tenantId === tenantId && !t.archived);
 }
 
@@ -103,6 +109,7 @@ export async function renameTeamInStore(tenantId: string, teamId: string, name: 
         .where(and(eq(phase5TeamsTable.tenantId, tenantId), eq(phase5TeamsTable.id, teamId)));
     } catch (err: any) {
       logStructured('error', 'PHASE5_DB_RENAME_TEAM_FAILED', { error: err?.message || err });
+      if (PRODUCTION) throw err;  // Fail loudly in production — data must not be silently lost
     }
   }
 
@@ -124,6 +131,7 @@ export async function archiveTeamInStore(tenantId: string, teamId: string) {
         .where(and(eq(phase5TeamsTable.tenantId, tenantId), eq(phase5TeamsTable.id, teamId)));
     } catch (err: any) {
       logStructured('error', 'PHASE5_DB_ARCHIVE_TEAM_FAILED', { error: err?.message || err });
+      if (PRODUCTION) throw err;  // Fail loudly in production — data must not be silently lost
     }
   }
 
@@ -165,6 +173,7 @@ export async function addMemberInStore(member: {
       await db.insert(phase5MembershipsTable).values(row as any);
     } catch (err: any) {
       logStructured('error', 'PHASE5_DB_ADD_MEMBER_FAILED', { error: err?.message || err });
+      if (PRODUCTION) throw err;  // Fail loudly in production — data must not be silently lost
     }
   }
 
@@ -181,9 +190,11 @@ export async function getMembersInStore(tenantId: string) {
       if (rows.length > 0) return rows;
     } catch (err: any) {
       logStructured('error', 'PHASE5_DB_GET_MEMBERS_FAILED', { error: err?.message || err });
+      if (PRODUCTION) throw err;  // Fail loudly in production — data must not be silently lost
     }
   }
 
+  if (PRODUCTION) throw new Error('[OPROX OS] Database unavailable or read failed in production. Cannot serve from in-memory store.');
   return memoryMemberships.filter((m) => m.tenantId === tenantId);
 }
 
@@ -202,6 +213,7 @@ export async function suspendMemberInStore(tenantId: string, userId: string) {
         .where(and(eq(phase5MembershipsTable.tenantId, tenantId), eq(phase5MembershipsTable.userId, userId)));
     } catch (err: any) {
       logStructured('error', 'PHASE5_DB_SUSPEND_MEMBER_FAILED', { error: err?.message || err });
+      if (PRODUCTION) throw err;  // Fail loudly in production — data must not be silently lost
     }
   }
 
@@ -275,6 +287,7 @@ export async function createChangeRequestInStore(cr: any) {
       await db.insert(phase5ChangeRequestsTable).values(row as any);
     } catch (err: any) {
       logStructured('error', 'PHASE5_DB_CREATE_CR_FAILED', { error: err?.message || err });
+      if (PRODUCTION) throw err;  // Fail loudly in production — data must not be silently lost
     }
   }
 
@@ -292,9 +305,11 @@ export async function getChangeRequestsInStore(tenantId: string) {
       if (rows.length > 0) return rows;
     } catch (err: any) {
       logStructured('error', 'PHASE5_DB_GET_CRS_FAILED', { error: err?.message || err });
+      if (PRODUCTION) throw err;  // Fail loudly in production — data must not be silently lost
     }
   }
 
+  if (PRODUCTION) throw new Error('[OPROX OS] Database unavailable or read failed in production. Cannot serve from in-memory store.');
   return memoryChangeRequests.filter((cr) => cr.tenantId === tenantId);
 }
 
@@ -313,9 +328,11 @@ export async function getChangeRequestByIdInStore(tenantId: string, crId: string
       if (rows.length > 0) return rows[0];
     } catch (err: any) {
       logStructured('error', 'PHASE5_DB_GET_CR_BY_ID_FAILED', { error: err?.message || err });
+      if (PRODUCTION) throw err;  // Fail loudly in production — data must not be silently lost
     }
   }
 
+  if (PRODUCTION) throw new Error('[OPROX OS] Database unavailable or read failed in production. Cannot serve from in-memory store.');
   return memoryChangeRequests.find((cr) => cr.tenantId === tenantId && cr.id === crId) || null;
 }
 
@@ -342,6 +359,7 @@ export async function updateChangeRequestInStore(
         );
     } catch (err: any) {
       logStructured('error', 'PHASE5_DB_UPDATE_CR_FAILED', { error: err?.message || err });
+      if (PRODUCTION) throw err;  // Fail loudly in production — data must not be silently lost
     }
   }
 
@@ -380,6 +398,7 @@ export async function addApprovalInStore(approval: {
       await db.insert(phase5ApprovalsTable).values(row as any);
     } catch (err: any) {
       logStructured('error', 'PHASE5_DB_ADD_APPROVAL_FAILED', { error: err?.message || err });
+      if (PRODUCTION) throw err;  // Fail loudly in production — data must not be silently lost
     }
   }
 
@@ -401,9 +420,11 @@ export async function getApprovalsByCrInStore(tenantId: string, crId: string) {
       if (rows.length > 0) return rows;
     } catch (err: any) {
       logStructured('error', 'PHASE5_DB_GET_APPROVALS_FAILED', { error: err?.message || err });
+      if (PRODUCTION) throw err;  // Fail loudly in production — data must not be silently lost
     }
   }
 
+  if (PRODUCTION) throw new Error('[OPROX OS] Database unavailable or read failed in production. Cannot serve from in-memory store.');
   return memoryApprovals.filter((a) => a.tenantId === tenantId && a.changeRequestId === crId);
 }
 
@@ -427,6 +448,7 @@ export async function invalidateApprovalsForCrInStore(tenantId: string, crId: st
         );
     } catch (err: any) {
       logStructured('error', 'PHASE5_DB_INVALIDATE_APPROVALS_FAILED', { error: err?.message || err });
+      if (PRODUCTION) throw err;  // Fail loudly in production — data must not be silently lost
     }
   }
 }
@@ -464,6 +486,7 @@ export async function addCommentInStore(comment: {
       await db.insert(phase5ReviewsCommentsTable).values(row as any);
     } catch (err: any) {
       logStructured('error', 'PHASE5_DB_ADD_COMMENT_FAILED', { error: err?.message || err });
+      if (PRODUCTION) throw err;  // Fail loudly in production — data must not be silently lost
     }
   }
 
@@ -485,9 +508,11 @@ export async function getCommentsByCrInStore(tenantId: string, crId: string) {
       if (rows.length > 0) return rows;
     } catch (err: any) {
       logStructured('error', 'PHASE5_DB_GET_COMMENTS_FAILED', { error: err?.message || err });
+      if (PRODUCTION) throw err;  // Fail loudly in production — data must not be silently lost
     }
   }
 
+  if (PRODUCTION) throw new Error('[OPROX OS] Database unavailable or read failed in production. Cannot serve from in-memory store.');
   return memoryComments.filter((c) => c.tenantId === tenantId && c.changeRequestId === crId);
 }
 
@@ -516,9 +541,11 @@ export async function getCodeOwnersInStore(tenantId: string) {
       if (rows.length > 0) return rows;
     } catch (err: any) {
       logStructured('error', 'PHASE5_DB_GET_CODE_OWNERS_FAILED', { error: err?.message || err });
+      if (PRODUCTION) throw err;  // Fail loudly in production — data must not be silently lost
     }
   }
 
+  if (PRODUCTION) throw new Error('[OPROX OS] Database unavailable or read failed in production. Cannot serve from in-memory store.');
   return memoryCodeOwners.filter((r) => r.tenantId === tenantId);
 }
 
@@ -533,6 +560,7 @@ export async function getAutonomyConfigInStore(tenantId: string) {
       if (rows.length > 0) return rows[0];
     } catch (err: any) {
       logStructured('error', 'PHASE5_DB_GET_AUTONOMY_CONFIG_FAILED', { error: err?.message || err });
+      if (PRODUCTION) throw err;  // Fail loudly in production — data must not be silently lost
     }
   }
 
@@ -564,6 +592,7 @@ export async function updateAutonomyConfigInStore(tenantId: string, config: any)
         });
     } catch (err: any) {
       logStructured('error', 'PHASE5_DB_UPDATE_AUTONOMY_CONFIG_FAILED', { error: err?.message || err });
+      if (PRODUCTION) throw err;  // Fail loudly in production — data must not be silently lost
     }
   }
 
@@ -606,6 +635,7 @@ export async function logCollaborationEventInStore(event: {
       await db.insert(phase5EventsTable).values(row as any);
     } catch (err: any) {
       logStructured('error', 'PHASE5_DB_LOG_EVENT_FAILED', { error: err?.message || err });
+      if (PRODUCTION) throw err;  // Fail loudly in production — data must not be silently lost
     }
   }
 
@@ -623,8 +653,10 @@ export async function getCollaborationEventsInStore(tenantId: string) {
       if (rows.length > 0) return rows;
     } catch (err: any) {
       logStructured('error', 'PHASE5_DB_GET_EVENTS_FAILED', { error: err?.message || err });
+      if (PRODUCTION) throw err;  // Fail loudly in production — data must not be silently lost
     }
   }
 
+  if (PRODUCTION) throw new Error('[OPROX OS] Database unavailable or read failed in production. Cannot serve from in-memory store.');
   return memoryEvents.filter((e) => e.tenantId === tenantId);
 }

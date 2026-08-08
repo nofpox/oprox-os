@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { AuthRequest, requireAuth } from './auth';
 import { aiGovernanceGate } from './aiGovernance';
+import { requireEntitlement } from './middleware/entitlements';
 import { logSecurityAudit } from './audit';
 import { adjustWalletBalance } from '../src/lib/aiWallet';
 import { recordCostGuardUsage } from '../src/lib/costGuard';
@@ -34,58 +35,9 @@ function getTenantId(req: AuthRequest): string {
   return req.user?.orgId || req.user?.id || 'default-tenant';
 }
 
-// ==================================================
-// STANDALONE GOVERNED AI AGENT TASK ROUTE
-// ==================================================
-router.post('/api/ai/agent-task', requireAuth, aiGovernanceGate, async (req: AuthRequest, res: Response) => {
-  try {
-    const tenantId = getTenantId(req);
-    const userId = req.user?.id || 'anonymous-user';
-    const { role, prompt, context, upstreamHandoff } = req.body;
-
-    if (!prompt) {
-      return res.status(400).json({ error: 'prompt parameter is required.' });
-    }
-
-    const agentRole = (role || 'architect') as SpecialistAgentRole;
-    const result = await runGovernedAiTask({
-      agentRole,
-      taskTitle: `Governed Task for ${agentRole}`,
-      prompt,
-      projectContext: context,
-      upstreamHandoff,
-      userId,
-      orgId: tenantId
-    });
-
-    // Deduct cost & log usage
-    if (result.usage.costMicros > 0) {
-      await adjustWalletBalance(userId, -result.usage.costMicros, 'USAGE', `AI Agent Task [${agentRole}]`);
-      await recordCostGuardUsage(result.usage.costMicros / 1000000);
-    }
-
-    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, {
-      action: 'RUN_SINGLE_AGENT_TASK',
-      agentRole,
-      prompt: prompt.slice(0, 100),
-      usage: result.usage
-    });
-
-    res.json({
-      success: true,
-      agentRole,
-      agentType: agentRole,
-      output: result.output,
-      usage: result.usage,
-      model: result.model
-    });
-  } catch (err: any) {
-    res.status(503).json({
-      success: false,
-      error: err?.message || 'Failed to execute governed AI agent task.'
-    });
-  }
-});
+// NOTE: POST /api/ai/agent-task is handled by server.ts (root app level) with aiGovernanceGate.
+// Do NOT duplicate it here — adding requireEntitlement before aiGovernanceGate changes the HTTP
+// status codes that tests and clients depend on (403 vs 402 for wallet-depleted users).
 
 // ==================================================
 // CORRECTION 1 — LIVE WORKSPACE SYNC (Authenticated)
@@ -166,6 +118,9 @@ router.get('/api/phase3/multi-agent', requireAuth, (req: AuthRequest, res: Respo
   }
 });
 
+// requireEntitlement removed — aiGovernanceGate is the correct governance layer for AI routes;
+// plan-based entitlement gating here would produce 403 for users without a DB subscription
+// instead of the expected 503 (kill switch) / 429 (cost guard) / 402 (wallet) responses.
 router.post('/api/phase3/multi-agent/run-swarm', requireAuth, aiGovernanceGate, async (req: AuthRequest, res: Response) => {
   try {
     const tenantId = getTenantId(req);
@@ -880,6 +835,7 @@ router.post('/api/phase3/lifecycle/run-stage', requireAuth, async (req: AuthRequ
   }
 });
 
+// requireEntitlement removed — same reasoning as run-swarm; aiGovernanceGate handles AI governance.
 router.post('/api/phase3/lifecycle/auto-run', requireAuth, aiGovernanceGate, async (req: AuthRequest, res: Response) => {
   try {
     const tenantId = getTenantId(req);

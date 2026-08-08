@@ -497,9 +497,12 @@ export async function renewLease(
   // Set parent link
   if (db) {
     await db.update(realEstateLeasesTable).set({ parentLeaseId }).where(eq(realEstateLeasesTable.id, childLease.id));
+    // Reflect the update in the returned object so callers see the correct parentLeaseId
+    childLease.parentLeaseId = parentLeaseId;
   } else {
     const idx = memoryLeases.findIndex((l) => l.id === childLease.id);
     if (idx !== -1) memoryLeases[idx].parentLeaseId = parentLeaseId;
+    childLease.parentLeaseId = parentLeaseId;
   }
 
   // Mark parent lease as RENEWAL_PENDING or EXPIRED
@@ -812,6 +815,11 @@ export async function createPayment(data: {
   // Auto-allocate if leaseId is provided
   if (data.leaseId) {
     await autoAllocatePayment(data.tenantId, row.id, data.leaseId);
+    // Re-read from DB so the returned object reflects the updated unallocatedAmountSar
+    if (db) {
+      const updated = await getPayment(data.tenantId, row.id);
+      if (updated) return updated;
+    }
   }
 
   return row;

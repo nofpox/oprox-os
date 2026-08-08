@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AuthRequest, requireAuth } from './auth';
 import { logSecurityAudit } from './audit';
+import { requireEntitlement } from './middleware/entitlements';
 import { checkDevelopmentPermission } from '../src/lib/phase5Rbac';
 import { classifyChangeRisk, checkAiAutonomyGate } from '../src/lib/phase5AutonomyEngine';
 import {
@@ -49,7 +50,7 @@ function getAuthenticatedTenant(req: AuthRequest): string {
 }
 
 // ── 1. Team & Workspace Management ────────────────────────────────────────
-router.post('/api/phase5/teams', requireAuth, async (req: AuthRequest, res) => {
+router.post('/api/phase5/teams', requireAuth, requireEntitlement('team_collaboration'), async (req: AuthRequest, res) => {
   try {
     const tenantId = getAuthenticatedTenant(req);
     const { name, description } = req.body;
@@ -89,7 +90,7 @@ router.post('/api/phase5/teams', requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
-router.get('/api/phase5/teams', requireAuth, async (req: AuthRequest, res) => {
+router.get('/api/phase5/teams', requireAuth, requireEntitlement('team_collaboration'), async (req: AuthRequest, res) => {
   try {
     const tenantId = getAuthenticatedTenant(req);
     const teams = await getTeamsInStore(tenantId);
@@ -99,7 +100,7 @@ router.get('/api/phase5/teams', requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
-router.put('/api/phase5/teams/:teamId', requireAuth, async (req: AuthRequest, res) => {
+router.put('/api/phase5/teams/:teamId', requireAuth, requireEntitlement('team_collaboration'), async (req: AuthRequest, res) => {
   try {
     const tenantId = getAuthenticatedTenant(req);
     const { teamId } = req.params;
@@ -125,7 +126,7 @@ router.put('/api/phase5/teams/:teamId', requireAuth, async (req: AuthRequest, re
   }
 });
 
-router.delete('/api/phase5/teams/:teamId', requireAuth, async (req: AuthRequest, res) => {
+router.delete('/api/phase5/teams/:teamId', requireAuth, requireEntitlement('team_collaboration'), async (req: AuthRequest, res) => {
   try {
     const tenantId = getAuthenticatedTenant(req);
     const { teamId } = req.params;
@@ -143,7 +144,7 @@ router.delete('/api/phase5/teams/:teamId', requireAuth, async (req: AuthRequest,
 });
 
 // ── 2. Member & Ownership Management ─────────────────────────────────────
-router.post('/api/phase5/members', requireAuth, async (req: AuthRequest, res) => {
+router.post('/api/phase5/members', requireAuth, requireEntitlement('team_collaboration'), async (req: AuthRequest, res) => {
   try {
     const tenantId = getAuthenticatedTenant(req);
     const { userId, roles, permissions, teamId } = req.body;
@@ -174,7 +175,7 @@ router.post('/api/phase5/members', requireAuth, async (req: AuthRequest, res) =>
   }
 });
 
-router.get('/api/phase5/members', requireAuth, async (req: AuthRequest, res) => {
+router.get('/api/phase5/members', requireAuth, requireEntitlement('team_collaboration'), async (req: AuthRequest, res) => {
   try {
     const tenantId = getAuthenticatedTenant(req);
     const members = await getMembersInStore(tenantId);
@@ -184,7 +185,7 @@ router.get('/api/phase5/members', requireAuth, async (req: AuthRequest, res) => 
   }
 });
 
-router.put('/api/phase5/members/:userId/suspend', requireAuth, async (req: AuthRequest, res) => {
+router.put('/api/phase5/members/:userId/suspend', requireAuth, requireEntitlement('team_collaboration'), async (req: AuthRequest, res) => {
   try {
     const tenantId = getAuthenticatedTenant(req);
     const { userId } = req.params;
@@ -201,7 +202,7 @@ router.put('/api/phase5/members/:userId/suspend', requireAuth, async (req: AuthR
   }
 });
 
-router.post('/api/phase5/members/transfer-ownership', requireAuth, async (req: AuthRequest, res) => {
+router.post('/api/phase5/members/transfer-ownership', requireAuth, requireEntitlement('team_collaboration'), async (req: AuthRequest, res) => {
   try {
     const tenantId = getAuthenticatedTenant(req);
     const { newOwnerId } = req.body;

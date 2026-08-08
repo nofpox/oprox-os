@@ -174,7 +174,8 @@ export type RealEstateOwnerRow = typeof realEstateOwnersTable.$inferSelect;
 export const realEstatePropertyOwnersTable = pgTable(
   "re_property_owners",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    // Application generates ids in po_xxx_timestamp format (not UUID) — must be text, not uuid.
+    id: text("id").primaryKey(),
     tenantId: text("tenant_id").notNull(),
     propertyId: text("property_id").notNull().references(() => realEstatePropertiesTable.id, { onDelete: "cascade" }),
     ownerId: text("owner_id").notNull().references(() => realEstateOwnersTable.id, { onDelete: "cascade" }),

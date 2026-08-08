@@ -22,7 +22,12 @@ export async function runMigrations(): Promise<{ success: boolean; error?: strin
   }
 }
 
-if (require.main === module) {
+// ESM-compatible "is this the entry point?" check (replaces CJS require.main === module)
+const isEntryPoint = process.argv[1] &&
+  (import.meta.url === `file://${process.argv[1]}` ||
+   import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/')));
+
+if (isEntryPoint) {
   runMigrations().then((res) => {
     if (!res.success) {
       process.exit(1);

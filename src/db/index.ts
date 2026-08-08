@@ -4,33 +4,45 @@ import * as schema from "./schema";
 
 const { Pool } = pg;
 
-let dbInstance: any = null;
-let pgPoolInstance: any = null;
-
-if (process.env.DATABASE_URL) {
-  try {
-    pgPoolInstance = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      max: (process.env.NODE_ENV === "test" || process.env.VITEST) ? 1 : 10,
-    });
-    dbInstance = drizzle(pgPoolInstance, { schema });
-  } catch (err) {
-    console.warn("PostgreSQL connection error, falling back to memory store:", err);
-  }
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    "FATAL: DATABASE_URL environment variable is required but not set. " +
+    "Server cannot start without a database connection."
+  );
 }
+
+let pgPoolInstance: InstanceType<typeof Pool>;
+let dbInstance: ReturnType<typeof drizzle>;
+
+try {
+  pgPoolInstance = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: (process.env.NODE_ENV === "test" || process.env.VITEST) ? 1 : 10,
+  });
+  dbInstance = drizzle(pgPoolInstance, { schema });
+} catch (err) {
+  throw new Error(`FATAL: PostgreSQL connection failed: ${err}`);
+}
+
+export const db = dbInstance!;
 
 export async function closeDbConnections(): Promise<void> {
   if (pgPoolInstance) {
     try {
       await pgPoolInstance.end();
-      dbInstance = null;
     } catch {
       // Ignore cleanup error
     }
   }
 }
 
-// In-Memory Fallback DB Store for development/preview without direct PG connection
+// ---------------------------------------------------------------------------
+// In-Memory Store — development/test scaffold only.
+// Fake payment credentials have been removed. Configure real keys via env vars:
+//   STRIPE_PUBLISHABLE_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+// This store does NOT replace the real database; it exists so lib modules
+// compile and run during development until full Drizzle migration (task #4).
+// ---------------------------------------------------------------------------
 class MemoryDbStore {
   systemState = new Map<string, { key: string; value: string; updatedAt: Date }>();
   emergencyLogs: schema.EmergencyActionLog[] = [];
@@ -56,13 +68,14 @@ class MemoryDbStore {
   invoiceSequences = new Map<number, number>();
   coupons = new Map<string, schema.CouponRow>();
   billingEvents: schema.BillingEventRow[] = [];
+  // Stripe credentials must come from environment variables — never hardcoded.
   paymentProviderConfig: schema.PaymentProviderConfigRow = {
     id: "stripe",
-    enabled: true,
+    enabled: false,
     mode: "test",
-    publishableKey: "pk_test_oprox_sample_key_12345",
-    secretKey: "sk_test_oprox_sample_secret_67890",
-    webhookSecret: "whsec_oprox_test_secret",
+    publishableKey: process.env.STRIPE_PUBLISHABLE_KEY ?? "",
+    secretKey: process.env.STRIPE_SECRET_KEY ?? "",
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
     updatedAt: new Date(),
   };
 
@@ -521,5 +534,3 @@ class MemoryDbStore {
 }
 
 export const memoryDb = new MemoryDbStore();
-
-export const db = dbInstance;

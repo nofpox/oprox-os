@@ -746,10 +746,19 @@ export async function convertReservationToLease(
     targetReTenantId = tenantObj.id;
   }
 
+  // Resolve propertyId: prefer the reservation's stored value; fall back to the unit's propertyId
+  // when the reservation was created without an explicit property link (e.g. unit-only reservation).
+  let resolvedPropertyId = res.propertyId || '';
+  if (!resolvedPropertyId && res.unitId) {
+    const { getUnit } = await import('./realEstateStore');
+    const unit = await getUnit(tenantId, res.unitId);
+    resolvedPropertyId = unit?.propertyId || '';
+  }
+
   // Create lease via Phase 2 Store
   const initialLease = await createLease({
     tenantId,
-    propertyId: res.propertyId || '',
+    propertyId: resolvedPropertyId,
     reTenantId: targetReTenantId,
     startDate: leaseDetails.startDate,
     endDate: leaseDetails.endDate,

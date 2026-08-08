@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AuthRequest, requireAuth } from './auth';
 import { logStructured } from '../src/lib/logger';
+import { requireEntitlement } from './middleware/entitlements';
 import {
   createRepoConnectionInStore,
   getRepoConnectionsFromStore,
@@ -287,7 +288,7 @@ router.get('/api/phase6/ci/pipelines', requireAuth, async (req: AuthRequest, res
   }
 });
 
-router.post('/api/phase6/ci/pipelines', requireAuth, async (req: AuthRequest, res) => {
+router.post('/api/phase6/ci/pipelines', requireAuth, requireEntitlement('pro_access'), async (req: AuthRequest, res) => {
   try {
     const tenantId = getTenantId(req);
     const { name, stages, allowlistedCommands, projectId } = req.body;
@@ -360,7 +361,7 @@ router.get('/api/phase6/ci/runs/:id', requireAuth, async (req: AuthRequest, res)
   }
 });
 
-router.post('/api/phase6/ci/repair', requireAuth, async (req: AuthRequest, res) => {
+router.post('/api/phase6/ci/repair', requireAuth, requireEntitlement('pro_access'), async (req: AuthRequest, res) => {
   try {
     const tenantId = getTenantId(req);
     const { repoId, runId, errorLog, maxAttempts, currentAttempt } = req.body;
@@ -378,7 +379,7 @@ router.post('/api/phase6/ci/repair', requireAuth, async (req: AuthRequest, res) 
       currentAttempt,
     });
 
-    res.json({ success: true, ...repairResult });
+    res.json({ ...repairResult, success: true });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || 'Failed to execute AI repair loop' });
   }
@@ -489,7 +490,7 @@ router.post('/api/phase6/environments/preview', requireAuth, async (req: AuthReq
 });
 
 // ── 6. Merge Eligibility & Governed Merge ────────────────────────────────────
-router.post('/api/phase6/merge/eligibility', requireAuth, async (req: AuthRequest, res) => {
+router.post('/api/phase6/merge/eligibility', requireAuth, requireEntitlement('pro_access'), async (req: AuthRequest, res) => {
   try {
     const tenantId = getTenantId(req);
     const { repoId, changeRequestId, sourceBranch, targetBranch, expectedHeadSha } = req.body;
@@ -513,7 +514,7 @@ router.post('/api/phase6/merge/eligibility', requireAuth, async (req: AuthReques
   }
 });
 
-router.post('/api/phase6/merge/execute', requireAuth, async (req: AuthRequest, res) => {
+router.post('/api/phase6/merge/execute', requireAuth, requireEntitlement('pro_access'), async (req: AuthRequest, res) => {
   try {
     const tenantId = getTenantId(req);
     const { repoId, changeRequestId, sourceBranch, targetBranch, expectedHeadSha } = req.body;

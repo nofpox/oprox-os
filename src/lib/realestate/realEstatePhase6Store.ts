@@ -137,7 +137,7 @@ export async function listImmersiveAssets(
 ) {
   if (isDbAvailable()) {
     try {
-      let conditions = [eq(realEstateImmersiveAssetsTable.tenantId, tenantId)];
+      const conditions = [eq(realEstateImmersiveAssetsTable.tenantId, tenantId)];
       if (filters?.linkedEntityType) {
         conditions.push(eq(realEstateImmersiveAssetsTable.linkedEntityType, filters.linkedEntityType));
       }
@@ -264,7 +264,7 @@ export async function listDigitalTwins(
 ) {
   if (isDbAvailable()) {
     try {
-      let conditions = [eq(realEstateDigitalTwinsTable.tenantId, tenantId)];
+      const conditions = [eq(realEstateDigitalTwinsTable.tenantId, tenantId)];
       if (filters?.linkedEntityType) {
         conditions.push(eq(realEstateDigitalTwinsTable.linkedEntityType, filters.linkedEntityType));
       }

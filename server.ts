@@ -1,16 +1,18 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import helmet from 'helmet';
 import cors from 'cors';
 import { GoogleGenAI } from '@google/genai';
-import dotenv from 'dotenv';
 import { Server } from 'http';
 
+import { sql } from 'drizzle-orm';
 import stripeWebhookRouter from './server/stripeWebhook';
 import apiRoutes from './server/routes';
 import { aiGovernanceGate } from './server/aiGovernance';
 import { logSecurityAudit } from './server/audit';
 import { AuthRequest, requireAuth } from './server/auth';
+import { clearEntitlementCache } from './server/middleware/entitlements';
 import { logStructured } from './src/lib/logger';
 import { getRedisStatus, closeRedisConnection } from './src/lib/redis';
 import { db, closeDbConnections } from './src/db';
@@ -42,8 +44,6 @@ import {
   updateWorkspaceProject,
   deleteWorkspaceProject,
 } from './src/lib/workspaceProjects';
-
-dotenv.config();
 
 export const app = express();
 
@@ -114,7 +114,7 @@ app.get(['/api/readiness', '/readyz'], async (req, res) => {
 
   if (db) {
     try {
-      await db.execute(db.raw ? db.raw`SELECT 1` : 'SELECT 1' as any);
+      await db.execute(sql`SELECT 1`);
       dbStatus = 'connected';
       dbDetails = 'PostgreSQL active and responsive';
     } catch (err: any) {
@@ -165,6 +165,7 @@ app.post('/api/billing/subscriptions', requireAuth, async (req: AuthRequest, res
       currency: req.body.currency || 'SAR',
       paymentMethod: req.body.paymentMethod || 'mada',
     });
+    clearEntitlementCache(userId, req.user?.orgId || '');
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(400).json({ error: err?.message || 'Failed to create subscription.' });
@@ -179,6 +180,7 @@ app.post('/api/billing/subscriptions/upgrade', requireAuth, async (req: AuthRequ
       currency: req.body.currency || 'SAR',
       paymentMethod: req.body.paymentMethod || 'mada',
     });
+    clearEntitlementCache(req.user!.id, req.user?.orgId || '');
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(400).json({ error: err?.message || 'Failed to upgrade subscription.' });
@@ -191,6 +193,7 @@ app.post('/api/billing/subscriptions/downgrade', requireAuth, async (req: AuthRe
       subscriptionId: req.body.subscriptionId,
       newPlanCode: req.body.newPlanCode,
     });
+    clearEntitlementCache(req.user!.id, req.user?.orgId || '');
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(400).json({ error: err?.message || 'Failed to schedule downgrade.' });
@@ -200,6 +203,7 @@ app.post('/api/billing/subscriptions/downgrade', requireAuth, async (req: AuthRe
 app.post('/api/billing/subscriptions/cancel', requireAuth, async (req: AuthRequest, res) => {
   try {
     const result = await cancelSubscriptionAtPeriodEnd(req.body.subscriptionId);
+    clearEntitlementCache(req.user!.id, req.user?.orgId || '');
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(400).json({ error: err?.message || 'Failed to schedule cancellation.' });

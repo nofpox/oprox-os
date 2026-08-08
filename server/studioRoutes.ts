@@ -7,6 +7,7 @@
 import { Router } from 'express';
 import { requireAuth, AuthRequest } from './auth';
 import { aiGovernanceGate } from './aiGovernance';
+import { requireEntitlement } from './middleware/entitlements';
 import { logSecurityAudit } from './audit';
 import {
   createStudioProject,
@@ -25,7 +26,7 @@ import { validateStudioSchemaModel } from '../src/lib/studio/studioSchemaEngine'
 const router = Router();
 
 // 1. List Studio Projects
-router.get('/api/studio/projects', requireAuth, async (req: AuthRequest, res) => {
+router.get('/api/studio/projects', requireAuth, requireEntitlement('basic_access'), async (req: AuthRequest, res) => {
   try {
     const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
     const projects = await listStudioProjects(tenantId);
@@ -36,7 +37,7 @@ router.get('/api/studio/projects', requireAuth, async (req: AuthRequest, res) =>
 });
 
 // 2. Create Studio Project
-router.post('/api/studio/projects', requireAuth, async (req: AuthRequest, res) => {
+router.post('/api/studio/projects', requireAuth, requireEntitlement('basic_access'), async (req: AuthRequest, res) => {
   try {
     const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
     const orgId = req.user?.orgId || 'org_default';
@@ -63,7 +64,7 @@ router.post('/api/studio/projects', requireAuth, async (req: AuthRequest, res) =
 });
 
 // 2a. Phase 5 — AI Planning before generation
-router.post('/api/studio/projects/ai-plan', requireAuth, aiGovernanceGate, async (req: AuthRequest, res) => {
+router.post('/api/studio/projects/ai-plan', requireAuth, requireEntitlement('pro_access'), aiGovernanceGate, async (req: AuthRequest, res) => {
   try {
     const { prompt } = req.body;
     if (!prompt || typeof prompt !== 'string') {
@@ -78,7 +79,7 @@ router.post('/api/studio/projects/ai-plan', requireAuth, aiGovernanceGate, async
 });
 
 // 2b. Phase 5 — AI Application Generation
-router.post('/api/studio/projects/ai-generate', requireAuth, aiGovernanceGate, async (req: AuthRequest, res) => {
+router.post('/api/studio/projects/ai-generate', requireAuth, requireEntitlement('pro_access'), aiGovernanceGate, async (req: AuthRequest, res) => {
   try {
     const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
     const orgId = req.user?.orgId || 'org_default';
@@ -211,14 +212,14 @@ router.put('/api/studio/projects/:id', requireAuth, async (req: AuthRequest, res
       });
     }
 
-    res.json({ success: true, ...saveResult });
+    res.json({ ...saveResult, success: true });
   } catch (err: any) {
     res.status(400).json({ error: err?.message || 'Failed to save Studio project.' });
   }
 });
 
 // 5. Studio AI Copilot (Protected by AI Governance Gate)
-router.post('/api/studio/projects/:id/copilot', aiGovernanceGate, async (req: AuthRequest, res) => {
+router.post('/api/studio/projects/:id/copilot', requireAuth, requireEntitlement('pro_access'), aiGovernanceGate, async (req: AuthRequest, res) => {
   try {
     const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
     const { prompt, scope, currentIr } = req.body;
@@ -288,7 +289,7 @@ router.post('/api/studio/projects/:id/promote', requireAuth, async (req: AuthReq
       workspaceProjectId: promoResult.workspaceProjectId,
     });
 
-    res.json({ success: true, ...promoResult });
+    res.json({ ...promoResult, success: true });
   } catch (err: any) {
     res.status(400).json({ error: err?.message || 'Studio promotion failed.' });
   }
@@ -475,7 +476,7 @@ router.post('/api/studio/projects/:id/export-workspace', requireAuth, async (req
     const exportResult = exportStudioToWorkspace(projectData.ir, userId);
 
     logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'EXPORT_STUDIO_WORKSPACE', projectId: req.params.id });
-    res.json({ success: true, ...exportResult });
+    res.json({ ...exportResult, success: true });
   } catch (err: any) {
     res.status(400).json({ error: err?.message || 'Workspace export failed.' });
   }
@@ -899,7 +900,7 @@ router.get('/api/studio/projects/:id/token-graph', requireAuth, async (req: Auth
 });
 
 // 27. Phase 4 — Governed Copilot AI Proposal
-router.post('/api/studio/projects/:id/copilot/propose', requireAuth, aiGovernanceGate, async (req: AuthRequest, res) => {
+router.post('/api/studio/projects/:id/copilot/propose', requireAuth, requireEntitlement('pro_access'), aiGovernanceGate, async (req: AuthRequest, res) => {
   try {
     const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
     const projectData = await getStudioProjectIr(req.params.id, tenantId);

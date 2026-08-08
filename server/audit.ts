@@ -17,7 +17,8 @@ export interface SecurityAuditEvent {
     | 'RESERVATION_ROLLED_BACK'
     | 'COSTGUARD_AUTO_KILLSWITCH'
     | 'ENCRYPTION_FAILED'
-    | 'DECRYPTION_FAILED';
+    | 'DECRYPTION_FAILED'
+    | 'STRIPE_WEBHOOK_PROCESSING_ERROR';
   userId?: string;
   userRole?: string;
   orgId?: string;

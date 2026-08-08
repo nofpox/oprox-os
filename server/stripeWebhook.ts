@@ -6,7 +6,13 @@ import { processBillingWebhookEvent } from '../src/lib/billing';
 const router = express.Router();
 
 export function getStripeClient(): Stripe {
-  const secretKey = process.env.STRIPE_SECRET_KEY || 'sk_test_fallback_key';
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) {
+    throw new Error(
+      'FATAL: STRIPE_SECRET_KEY is required but not set. ' +
+      'Obtain your key from https://dashboard.stripe.com/apikeys'
+    );
+  }
   return new Stripe(secretKey, {
     apiVersion: '2025-02-24.acacia' as any,
   });
@@ -30,33 +36,24 @@ router.post(
       return res.status(400).json({ error: 'Missing stripe-signature header.' });
     }
 
-    const stripe = getStripeClient();
     let event: Stripe.Event;
+    try {
+      const stripe = getStripeClient();
+      event = stripe.webhooks.constructEvent(req.body, signature, webhookSecret);
+    } catch (err: any) {
+      // Sanitize error — never expose internal messages (e.g. "FATAL: STRIPE_SECRET_KEY not set")
+      // to callers. A generic message is all they need; details go to the audit log only.
+      logSecurityAudit('INVALID_STRIPE_WEBHOOK', { ip: req.ip, path: req.path, method: req.method }, { reason: 'Signature verification failed', error: err.message });
+      return res.status(400).json({ error: 'Webhook Signature Verification Failed.' });
+    }
 
     try {
-      const payload = Buffer.isBuffer(req.body) ? req.body : JSON.stringify(req.body);
-      event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+      await processBillingWebhookEvent(event);
+      return res.status(200).json({ received: true });
     } catch (err: any) {
-      logSecurityAudit('INVALID_STRIPE_WEBHOOK', { ip: req.ip, path: req.path, method: req.method }, { reason: 'Signature Verification Failed', error: err.message });
-      return res.status(400).json({ error: `Signature Verification Failed: ${err.message}` });
+      logSecurityAudit('STRIPE_WEBHOOK_PROCESSING_ERROR', { ip: req.ip, path: req.path, method: req.method }, { eventType: event.type, error: err.message });
+      return res.status(500).json({ error: 'Webhook processing failed.' });
     }
-
-    // Process valid constructed event idempotently
-    const idempotency = await processBillingWebhookEvent({ id: event.id, type: event.type, data: event.data });
-    if (idempotency.duplicate) {
-      console.log(`[STRIPE WEBHOOK IDEMPOTENT SKIP] Event ID: ${event.id}`);
-      return res.json({ received: true, id: event.id, type: event.type, idempotent: true });
-    }
-
-    console.log(`[STRIPE WEBHOOK VERIFIED] Event ID: ${event.id} | Type: ${event.type}`);
-
-    logSecurityAudit('PRIVILEGED_ADMIN_ACTION', { ip: req.ip, path: req.path, method: req.method }, {
-      action: 'STRIPE_WEBHOOK_PROCESSED',
-      eventId: event.id,
-      eventType: event.type,
-    });
-
-    res.json({ received: true, id: event.id, type: event.type, idempotent: false });
   }
 );
 
